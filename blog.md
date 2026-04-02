@@ -134,10 +134,10 @@ over a maximum of 30 hops:
 
   1     2 ms    <1 ms    <1 ms  192.168.0.1
   2    12 ms     3 ms     7 ms  192.168.1.1
-  3     *       88 ms    51 ms  100.72.0.1
-  4    28 ms    55 ms    58 ms  172.253.66.125
-  5     9 ms     9 ms     9 ms  108.170.248.161
-  6     8 ms     7 ms     6 ms  142.251.232.115
+  3     *       88 ms    51 ms  
+  4    28 ms    55 ms    58 ms  
+  5     9 ms     9 ms     9 ms  
+  6     8 ms     7 ms     6 ms  
   7    32 ms    22 ms    10 ms  dns.google [8.8.8.8]
 ```text
 
