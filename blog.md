@@ -69,7 +69,7 @@ graph TD
         M_Node2 <--> M_Node3[Node C]
         M_Node3 <--> M_Node1
     end
-```text
+```
 
 **The golden rule of Swarm networking:** Each device needs to be able to communicate directly with every other device in the cluster.
 
@@ -134,12 +134,12 @@ over a maximum of 30 hops:
 
   1     2 ms    <1 ms    <1 ms  192.168.0.1
   2    12 ms     3 ms     7 ms  192.168.1.1
-  3     *       88 ms    51 ms  
-  4    28 ms    55 ms    58 ms  
-  5     9 ms     9 ms     9 ms  
-  6     8 ms     7 ms     6 ms  
+  3     *       88 ms    51 ms  100.72.0.1
+  4    28 ms    55 ms    58 ms  172.253.66.125
+  5     9 ms     9 ms     9 ms  108.170.248.161
+  6     8 ms     7 ms     6 ms  142.251.232.115
   7    32 ms    22 ms    10 ms  dns.google [8.8.8.8]
-```text
+```
 
 ### Understanding Network Hops: The OSI Model Explained
 
@@ -175,13 +175,13 @@ graph TB
     style L1 fill:#e1ffe1
 ```
 
-For our discussion, we'll focus on Layers 1 through 4, as these are directly involved in how data packets travel across networks. However, understanding the complete 7-layer model provides important context for how applications communicate end-to-end.
+We'll cover all 7 layers — briefly for the upper three (5–7), and in depth for the lower four (1–4), since those are the ones directly involved in how data packets travel across networks.
 
 ---
 
 #### Upper Layers (5-7): Brief Overview
 
-While our focus is on Layers 1-4 for understanding network hops, here's a quick overview of the upper layers:
+Layers 5–7 handle what happens above the network — sessions, data formatting, and application protocols:
 
 ##### Layer 7: Application Layer
 **What it handles:** User-facing network services and protocols
@@ -253,7 +253,7 @@ A logical endpoint that identifies a specific service or application on a device
 
 Example: Your browser (port 54321) → Web server (port 443)
 Protocol: TCP for reliable delivery
-```text
+```
 
 ##### Communication Endpoint (Socket)
 A **communication endpoint**, also called a **socket**, is uniquely identified by the combination of an IP address and a port number. This combination (IP:Port) provides a complete address for delivering data to a specific application on a specific device across a network. For example, `192.168.1.10:443` identifies the HTTPS service running on the device at IP address 192.168.1.10.
@@ -330,7 +330,7 @@ This layer manages the **physical delivery of data between two devices that are 
 
 Example: Your PC's NIC → Your Router's interface
 MAC addresses change at EVERY hop (rewritten by each router)
-```text
+```
 
 ---
 
@@ -385,7 +385,7 @@ Destination      Gateway         Interface    Metric   Description
 192.168.1.0/24   0.0.0.0        eth0         0        [Local network - direct delivery]
 10.0.0.0/8       192.168.1.1    eth0         10       [Corporate VPN via router]
 0.0.0.0/0        192.168.1.1    eth0         100      [Default route - everything else]
-```text
+```
 
 **Reading this table:**
 - First row: "For devices on 192.168.1.0/24, send directly (0.0.0.0 means no gateway needed)"
@@ -500,13 +500,13 @@ Here's the crucial detail many miss: **Layer 3 (IP) addresses stay constant, but
 ```
 [Ethernet Header] Src MAC: Your PC -> Dst MAC: Your Router
 [IP Header]       Src IP: Your PC -> Dst IP: Google DNS (8.8.8.8)
-```text
+```
 
 **At Your Router (First Hop):**
 ```
 [Ethernet Header] Src MAC: Your Router -> Dst MAC: ISP Router
 [IP Header]       Src IP: Your PC -> Dst IP: Google DNS (8.8.8.8) <-- UNCHANGED
-```text
+```
 
 This pattern continues at every hop until reaching the destination.
 
@@ -530,7 +530,7 @@ Tracing route to dns.google [8.8.8.8]
 3    12 ms    11 ms    13 ms    72.14.215.85       [ISP's Regional Router]
 ...
 5    18 ms    17 ms    19 ms    8.8.8.8            [Destination: Google DNS]
-```text
+```
 
 #### How Do Response Packets Return to You?
 
@@ -2111,3 +2111,1575 @@ Seamless, transparent cross-host communication at L2 scale.
 ```
 
 This foundation is essential for understanding Docker Swarm's networking capabilities, troubleshooting issues, and designing robust, scalable containerized infrastructure.
+
+---
+
+## 4B. Why Docker Desktop Cannot Form a Swarm Cluster
+
+---
+
+### The Linux Prerequisite: Containers are a Linux Feature
+
+Before we examine Docker Desktop's limitations, we must understand a fundamental constraint: **containers are inherently a Linux technology**.
+
+#### Containers Require Linux Kernel Features
+
+As we established earlier, containers rely on specific Linux kernel primitives:
+
+- **Namespaces (PID, NET, MNT, UTS, IPC, USER, CGROUP):** Isolation mechanisms
+- **cgroups (Control Groups):** Resource limitation and accounting
+- **Union Filesystems (OverlayFS, AUFS):** Layered storage for container images
+- **Netfilter/iptables:** Network packet filtering and NAT
+- **Linux network stack:** Virtual ethernet devices (veth), bridges, VXLAN
+
+**These features do not exist in the Windows or macOS kernels.** Therefore, to run Docker containers on Windows or macOS, we need a Linux environment.
+
+---
+
+### Windows Solution: WSL 2 (Windows Subsystem for Linux 2)
+
+#### What is WSL 2?
+
+**WSL 2** is Microsoft's technology for running a genuine Linux kernel directly on Windows, using a lightweight virtual machine architecture.
+
+**Key Components:**
+
+1. **Real Linux Kernel:** Microsoft ships an actual Linux kernel (maintained by Microsoft) that runs in a Hyper-V virtual machine
+2. **Hyper-V Virtualization:** Uses Windows' native hypervisor technology
+3. **Managed VM:** The Linux VM is automatically managed—starts on demand, stops when idle
+4. **Tight Integration:** Direct filesystem access between Windows and Linux, shared network stack
+
+---
+
+#### WSL 2 Architecture (Simplified)
+
+```text
+┌───────────────────────────────────────────────────────┐
+│              Windows Host (Windows 11)                │
+│                                                       │
+│  ┌─────────────────────────────────────────────┐    │
+│  │      User Space (Windows Applications)      │    │
+│  │  • Docker Desktop CLI (docker.exe)          │    │
+│  │  • Docker Dashboard (GUI)                   │    │
+│  └──────────────────┬──────────────────────────┘    │
+│                     │                                │
+│  ┌──────────────────▼──────────────────────────┐    │
+│  │         Windows Kernel (NT Kernel)          │    │
+│  └──────────────────┬──────────────────────────┘    │
+│                     │                                │
+│  ┌──────────────────▼──────────────────────────┐    │
+│  │     Hyper-V Hypervisor (Type 1)             │    │
+│  └──────────┬───────────────────────────────────┘   │
+│             │                                        │
+│             │  Spawns Lightweight VM                │
+│             ↓                                        │
+│  ┌──────────────────────────────────────────────┐   │
+│  │      WSL 2 Linux VM                          │   │
+│  │                                              │   │
+│  │  ┌────────────────────────────────────┐     │   │
+│  │  │   Linux Kernel (Real Linux)        │     │   │
+│  │  │   • Namespaces                     │     │   │
+│  │  │   • cgroups                        │     │   │
+│  │  │   • OverlayFS                      │     │   │
+│  │  │   • iptables                       │     │   │
+│  │  └────────────────────────────────────┘     │   │
+│  │              ↓                               │   │
+│  │  ┌────────────────────────────────────┐     │   │
+│  │  │   Docker Engine (dockerd)          │     │   │
+│  │  │   • containerd                     │     │   │
+│  │  │   • runc                           │     │   │
+│  │  └────────────────────────────────────┘     │   │
+│  │              ↓                               │   │
+│  │  ┌────────────────────────────────────┐     │   │
+│  │  │   Containers                       │     │   │
+│  │  │   (Running in Linux namespaces)    │     │   │
+│  │  └────────────────────────────────────┘     │   │
+│  │                                              │   │
+│  └──────────────────────────────────────────────┘   │
+└───────────────────────────────────────────────────────┘
+```
+
+**How it works:**
+
+1. **Windows boots** → Hyper-V hypervisor initializes
+2. **User starts Docker Desktop** → Triggers WSL 2 VM creation
+3. **Lightweight Linux VM starts** → Boots Linux kernel in seconds
+4. **Docker Engine starts inside VM** → `dockerd` runs in the Linux environment
+5. **Containers run natively** → Full access to Linux kernel features
+6. **Docker CLI on Windows** → Communicates with Docker Engine in VM via named pipes/sockets
+
+**Key Benefit:** Containers run with **native Linux performance** because they're executing in a real Linux kernel, not emulated.
+
+---
+
+### Docker Desktop for Windows: Architecture Overview
+
+Docker Desktop is a complex application with multiple processes and components working together to provide a seamless container experience on Windows.
+
+#### Core Docker Desktop Processes
+
+Let's examine the key processes that spawn when Docker Desktop runs:
+
+---
+
+##### 1. com.docker.service (Docker Desktop Service)
+
+**Location:** Windows background service
+
+**Role:**
+- **Lifecycle management** of the Docker Desktop VM
+- **Privileged operations** that require admin rights (port forwarding, network configuration)
+- **Hyper-V VM orchestration** (starting/stopping the WSL 2 VM)
+- **Windows integration** (file sharing, credentials management)
+
+**Runs as:** Windows Service (elevated privileges)
+
+**Communication:**
+- Listens on named pipes for commands from Docker Desktop UI
+- Communicates with Hyper-V to manage VM lifecycle
+
+---
+
+##### 2. com.docker.backend (Docker Desktop Backend)
+
+**Location:** Windows user-space application
+
+**Role:**
+- **Main backend coordinator** for Docker Desktop
+- **Resource allocation** (CPU, memory limits for the VM)
+- **Settings management** (user preferences, Docker daemon configuration)
+- **Update management** (checking for and applying Docker Desktop updates)
+- **Extension hosting** (Docker Desktop extensions framework)
+
+**Runs as:** User-level process
+
+**Communication:**
+- IPC with `com.docker.service` via named pipes
+- REST API server for Docker Dashboard UI
+- Communicates with Docker Engine via Docker socket
+
+---
+
+##### 3. vpnkit.exe (VPNKit Networking Proxy)
+
+**Location:** Windows user-space application
+
+**Role:**
+- **Network proxy** between Windows host and Linux VM
+- **Outbound traffic forwarding** from containers to the internet
+- **DNS resolution** for containers
+- **Port forwarding** from Windows host to containers
+- **VPN/proxy compatibility** layer (allows containers to work with corporate VPNs)
+
+**Runs as:** User-level process
+
+**Communication:**
+- Shared memory channel with Linux VM (Hyper-V socket)
+- Windows network stack for outbound connections
+- Named pipes for control plane commands
+
+**Critical Component:** This is central to understanding Docker Desktop's networking limitations.
+
+---
+
+##### 4. com.docker.cli (Docker CLI)
+
+**Location:** `docker.exe` command-line tool
+
+**Role:**
+- **User-facing CLI** for Docker commands (`docker run`, `docker ps`, etc.)
+- **API client** that translates commands to Docker Engine API calls
+- **Context management** (connecting to different Docker hosts)
+
+**Runs as:** User-invoked command-line process
+
+**Communication:**
+- Connects to Docker Engine via named pipe: `\\.\pipe\docker_engine`
+- Named pipe is a bridge to the Linux VM's Docker socket (`/var/run/docker.sock`)
+
+---
+
+##### 5. com.docker.dev-envs (Development Environments)
+
+**Role:** Manages Docker Desktop's integrated development environments feature
+
+---
+
+##### 6. Docker Engine (dockerd) — Inside Linux VM
+
+**Location:** Inside WSL 2 Linux VM
+
+**Role:**
+- **Core Docker daemon** managing containers, images, networks, volumes
+- **containerd** (container runtime)
+- **runc** (OCI-compliant container executor)
+
+**Runs as:** Linux daemon inside the VM
+
+**Communication:**
+- Unix socket: `/var/run/docker.sock` (inside VM)
+- Exposed to Windows via named pipe bridge
+
+---
+
+#### Process Hierarchy and Communication Flow
+
+```text
+Windows Host
+    │
+    ├─ com.docker.service (Windows Service - Admin)
+    │       ↓
+    │   Manages Hyper-V VM lifecycle
+    │
+    ├─ com.docker.backend (User Process)
+    │       │
+    │       ├─ Manages settings & resources
+    │       └─ Communicates with service
+    │
+    ├─ vpnkit.exe (User Process)
+    │       │
+    │       ├─ Proxies network traffic
+    │       └─ Shared memory → Linux VM
+    │
+    ├─ Docker Dashboard (Electron App)
+    │       └─ UI for Docker Desktop
+    │
+    └─ docker.exe (User-invoked CLI)
+            │
+            └─ Named pipe: \\.\pipe\docker_engine
+                    ↓
+            ┌───────────────────────────┐
+            │   Named Pipe Bridge       │
+            └───────────┬───────────────┘
+                        ↓
+        ╔═══════════════════════════════════╗
+        ║     WSL 2 Linux VM                ║
+        ║                                   ║
+        ║   dockerd (Docker Engine)         ║
+        ║       ↓                           ║
+        ║   /var/run/docker.sock            ║
+        ║       ↓                           ║
+        ║   containerd → runc               ║
+        ║       ↓                           ║
+        ║   Containers (namespaces)         ║
+        ╚═══════════════════════════════════╝
+```
+
+---
+
+### The Three Critical Barriers to Docker Swarm on Docker Desktop
+
+Docker Swarm requires specific networking capabilities that Docker Desktop's architecture fundamentally cannot provide:
+
+1. **Routable IP addresses** for each swarm node
+2. **Bidirectional, unsolicited network communication** between nodes
+3. **Direct exposure of Docker Engine ports** (not container ports) to the network
+
+Let's examine each barrier in detail.
+
+---
+
+### Barrier 1: No Routable IP Address
+
+#### The Problem: VM is Network-Isolated
+
+The WSL 2 Linux VM **does not have a routable IP address** on your physical network. It exists in a **virtualized network** managed by Hyper-V.
+
+```text
+Physical Network (192.168.1.0/24):
+    ├─ Router: 192.168.1.1
+    ├─ Desktop PC: 192.168.1.100  ← Windows host
+    ├─ Laptop: 192.168.1.50
+    └─ Server: 192.168.1.200
+
+Hyper-V Internal Network (172.x.x.x - ephemeral):
+    └─ WSL 2 VM: 172.20.144.5  ← Not routable from physical network!
+```
+
+**What Docker Desktop does:**
+
+```bash
+# Inside WSL 2 VM
+ip addr show eth0
+
+eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500
+    inet 172.20.144.5/20 brd 172.20.159.255 scope global eth0
+```
+
+**The address `172.20.144.5` is:**
+- Assigned dynamically by Hyper-V's virtual switch
+- **Not reachable** from the physical network (`192.168.1.x`)
+- **Changes on every VM restart** (ephemeral)
+- **Behind NAT** managed by Hyper-V host networking service
+
+---
+
+#### Swarm Requirement vs. Reality
+
+**Swarm needs:**
+- Each node must have a **stable, routable IP** that other nodes can reach
+- Nodes must directly connect to each other on ports 2377, 7946, 4789
+
+**Docker Desktop provides:**
+- **Ephemeral, non-routable IP** in a private Hyper-V network
+- **No way to assign a static, physical network IP** to the VM
+- **NAT isolation** preventing inbound connections
+
+**Consequence:** Other swarm nodes cannot reach the Docker Engine running inside the WSL 2 VM. The IP address `172.20.144.5` is meaningless outside the Windows host.
+
+---
+
+#### VPNKit's Role in Addressing
+
+VPNKit provides a **virtual addressing layer** but this is for **outbound traffic only**:
+
+```text
+Container inside VM wants to access internet:
+    Container (10.0.1.5)
+        ↓
+    Docker Engine (172.20.144.5)
+        ↓
+    VPNKit (shared memory channel)
+        ↓
+    Windows Host Network Stack
+        ↓
+    Internet (appears to come from Windows host IP: 192.168.1.100)
+```
+
+VPNKit **translates outbound requests** but **does not provide a routable inbound IP** for the Docker Engine itself.
+
+---
+
+#### Why Not Install Tailscale Inside the VM?
+
+This seems like an obvious solution: install Tailscale (or another VPN) inside the WSL 2 VM to give it a routable Tailscale IP.
+
+**Why it doesn't work:**
+
+##### 1. Read-Only VM Filesystem (Immutable Infrastructure)
+
+Docker Desktop's **internal `docker-desktop` WSL2 distro** uses an **immutable, managed filesystem** for system directories:
+
+```bash
+# Inside the docker-desktop WSL2 distro
+mount | grep overlay
+
+overlay on / type overlay (ro,relatime,lowerdir=/snapshot/root:...)
+```
+
+**Key directories are read-only:**
+- `/usr` → Read-only
+- `/bin`, `/sbin` → Read-only
+- `/lib` → Read-only
+
+**Why this design?**
+- **Reliability:** Prevents corruption; VM can be reset to known-good state
+- **Updates:** Docker Desktop can safely replace the entire VM during updates
+- **Consistency:** All users have identical VM environment
+
+**Consequence:** You **cannot install packages** (like Tailscale) in standard locations inside Docker Desktop's managed VM:
+
+```bash
+# Attempting to install Tailscale inside the docker-desktop distro
+sudo apt-get update
+# This might work in /var/cache/apt
+
+sudo apt-get install tailscale
+# Fails: Cannot write to /usr/bin, /usr/sbin
+```
+
+> **Important:** This read-only restriction applies **only to Docker Desktop's internal `docker-desktop` WSL2 distro**. A standard WSL2 Ubuntu distro installed alongside Docker Desktop has a fully writable filesystem and supports `apt install tailscale` without issue. The solution (Docker Engine + Tailscale in a real WSL2 distro) works precisely because it operates outside Docker Desktop's managed VM.
+
+---
+
+##### 2. No systemd / Init System
+
+Docker Desktop's `docker-desktop` WSL2 distro **does not run systemd**. It uses a custom minimal init written specifically for Docker Desktop's LinuxKit-based VM:
+
+```bash
+# Inside the docker-desktop WSL2 distro
+ps aux | head
+
+USER  PID  COMMAND
+root    1  /init  ← Custom minimal init, not systemd
+root    8  /init
+root    9  /init
+root   10  dockerd
+```
+
+**Implications for this VM:**
+- Cannot use `systemctl start tailscaled` (no systemd)
+- Cannot enable services to start at boot
+- Cannot manage daemon processes in the standard Linux way
+
+For the `tailscaled` daemon to run persistently it needs a service manager (systemd, OpenRC, or equivalent) to:
+- Start `tailscaled` at boot
+- Restart it on failure
+- Handle network configuration changes
+
+> **Clarification:** WSL2 as a technology **has supported systemd since September 2022** (Windows 11 22H2). A standard WSL2 Ubuntu distro runs systemd normally — `sudo systemctl` works out of the box. The no-systemd limitation described above is specific to Docker Desktop's managed internal VM (`docker-desktop` distro), not to WSL2 in general.
+
+---
+
+##### 3. Network Configuration Restrictions
+
+Even if you could run Tailscale, the VM's network stack is **tightly controlled** by Docker Desktop's networking infrastructure:
+
+- **Routes are managed** by VPNKit and Docker's networking
+- **iptables rules** are dynamically configured by Docker
+- **Interface modifications** may be overridden by Docker Desktop's network management
+
+Tailscale needs to:
+- Create TUN interface (`tailscale0`)
+- Modify routing tables
+- Add iptables rules
+
+These operations **conflict** with Docker Desktop's network management.
+
+---
+
+##### 4. VM Resets on Updates
+
+Docker Desktop **frequently updates the VM**:
+- Security patches
+- Docker Engine version updates
+- Feature additions
+
+Each update **replaces the entire VM**, wiping any manual installations.
+
+Even if you successfully installed Tailscale, it would **disappear on the next Docker Desktop update**.
+
+---
+
+### Barrier 2: Port Forwarding Nature and Limitations
+
+#### What is Port Forwarding?
+
+**Port forwarding** is a NAT technique that redirects traffic from an external IP:port to an internal IP:port.
+
+```text
+Traditional Port Forwarding (Router):
+
+Internet (203.45.67.89)
+    ↓
+    Port 8080 request
+    ↓
+Router (NAT gateway)
+    ↓
+    Rule: External 8080 → Internal 192.168.1.50:80
+    ↓
+Internal Server (192.168.1.50:80)
+```
+
+**Purpose:** Allow external clients to reach services on private IPs behind NAT.
+
+---
+
+#### Docker Desktop's Port Forwarding
+
+Docker Desktop uses port forwarding to expose container ports to Windows:
+
+```text
+Windows Host (192.168.1.100)
+    ↓
+    User accesses: localhost:8080
+    ↓
+vpnkit.exe (Port Forwarding)
+    ↓
+    Shared memory channel
+    ↓
+WSL 2 Linux VM (172.20.144.5)
+    ↓
+Docker Engine
+    ↓
+Container (10.0.1.5:80)
+```
+
+**Example:**
+
+```bash
+# Run container with port mapping
+docker run -p 8080:80 nginx
+
+# Windows host can access:
+# http://localhost:8080  → Container's port 80
+```
+
+---
+
+#### The Nature of Port Forwarding: Unidirectional, Request-Response
+
+Port forwarding is designed for **client-server, request-response** communication:
+
+**Characteristics:**
+1. **Unidirectional initiation:** Client always initiates; server responds
+2. **Stateful NAT:** Maintains connection state in NAT table
+3. **Single destination:** Each forwarded port goes to one internal endpoint
+4. **TCP/HTTP-friendly:** Works well for web servers, APIs, databases
+
+**Example (HTTP):**
+
+```text
+Client (192.168.1.50) → Request → Port Forward → Server (container)
+Client ← Response ← Port Forward ← Server
+
+Connection state maintained in NAT table:
+  192.168.1.50:54321 ↔ 192.168.1.100:8080 → 10.0.1.5:80
+```
+
+**This works because:**
+- Client initiates the connection (outbound from client's perspective)
+- Server's responses follow the established connection
+- NAT can track the connection in its state table
+
+---
+
+#### Why Port Forwarding Fails for Docker Swarm
+
+Docker Swarm requires **bidirectional, peer-to-peer** communication, not client-server:
+
+##### Problem 1: Multiple Ports for Different Purposes
+
+```text
+Swarm Communication Ports:
+
+2377/tcp → Cluster management (Raft, gRPC)
+7946/tcp → Gossip protocol
+7946/udp → Gossip protocol
+4789/udp → VXLAN overlay network data plane
+```
+
+**Challenge:** You'd need to forward all these ports, but:
+- Port 2377 is for the **Docker Engine**, not a container
+- Port 7946 needs **bidirectional** TCP and UDP
+- Port 4789 (VXLAN) has special requirements (discussed later)
+
+---
+
+##### Problem 2: Container Ports vs. Docker Engine Ports
+
+**Docker Desktop's port forwarding exposes container ports, not Docker Engine ports.**
+
+```text
+Standard Docker Desktop Port Forward:
+  Windows Host:8080 → Container:80
+
+What Swarm Needs:
+  Physical Network:2377 → Docker Engine:2377
+                    ↑
+                    Docker Engine is in the VM, not a container!
+```
+
+**Even if you configure:**
+
+```bash
+# Hypothetically forwarding swarm ports
+netsh interface portproxy add v4tov4 ^
+  listenport=2377 connectaddress=172.20.144.5 connectport=2377
+```
+
+**You'd expose the Docker Engine** to your local network, but:
+
+1. **Ephemeral VM IP:** `172.20.144.5` changes on VM restart
+2. **No route for other nodes:** External swarm nodes still can't reach it
+3. **Security risk:** Docker Engine shouldn't be directly exposed
+4. **VPNKit interference:** VPNKit might interfere with low-level port forwarding
+
+---
+
+##### Problem 3: Unsolicited Inbound Connections
+
+Swarm nodes need to **initiate connections to each other** without a prior request:
+
+```text
+Swarm Gossip Scenario:
+
+worker-1 (on physical network)
+    ↓
+    Spontaneously sends health check to worker-2
+    ↓
+worker-2 (Docker Desktop VM)
+```
+
+**Port forwarding requires:**
+- A connection initiated **from outside** (e.g., worker-1 → Docker Desktop)
+- But Docker Desktop's NAT expects connections initiated **from inside** (container → outside)
+
+**Mismatch:** Swarm's peer-to-peer communication doesn't fit port forwarding's request-response model.
+
+---
+
+#### Process Chain for Port Forwarding Use Case
+
+Let's trace how a typical port-forwarded request works:
+
+**Scenario:** Accessing a container's web server from Windows
+
+```text
+Step 1: User makes request
+  Windows Browser → http://localhost:8080
+
+Step 2: Windows network stack
+  Lookup: localhost:8080
+  Destination: 127.0.0.1:8080
+
+Step 3: vpnkit.exe intercepts
+  Listening on 0.0.0.0:8080 (Windows side)
+  Matches port forwarding rule:
+    8080 → VM container port 80
+
+Step 4: Shared memory channel
+  vpnkit.exe writes request to shared memory buffer
+  Signals Linux VM via Hyper-V socket
+
+Step 5: VPNKit proxy (inside VM)
+  Reads from shared memory
+  Reconstructs TCP connection
+  Forwards to container IP:port (10.0.1.5:80)
+
+Step 6: Container receives request
+  nginx processes HTTP request
+
+Step 7: Response path (reverse)
+  Container → VM VPNKit → Shared memory →
+  vpnkit.exe → Windows network stack → Browser
+```
+
+**Key observation:** This path works for **HTTP/TCP request-response** but not for **spontaneous peer-to-peer** protocols like Swarm gossip.
+
+---
+
+### Barrier 3: Outbound Traffic Limitations and VPNKit Proxying
+
+#### The Outbound Traffic Problem
+
+Docker Swarm doesn't just need to **receive** connections—it needs to **initiate** connections to other nodes, potentially **across the internet** or **through corporate networks**.
+
+**Requirement:** Bidirectional, peer-to-peer communication where any node can:
+- Initiate a connection to any other node
+- Send unsolicited packets (UDP for gossip and VXLAN)
+- Maintain persistent TCP connections (for Raft consensus)
+
+**Docker Desktop's challenge:** The VM is isolated behind NAT and relies on VPNKit for all external communication.
+
+---
+
+#### Understanding Proxies
+
+A **proxy** is an intermediary that forwards requests on behalf of clients.
+
+##### Types of Proxies
+
+---
+
+###### 1. Forward Proxy (Client-Side Proxy)
+
+Client → Proxy → Internet
+
+```text
+Corporate Network:
+
+Employee PC (192.168.10.50)
+    ↓ Configured to use proxy
+Squid Proxy (192.168.10.1:3128)
+    ↓ Proxy makes request on behalf
+Internet
+```
+
+**Characteristics:**
+- Client is **aware** of the proxy (configured in browser/OS)
+- Proxy acts on behalf of **clients**
+- Common protocols: HTTP CONNECT, SOCKS5
+- **Use cases:** Content filtering, caching, anonymity
+
+---
+
+###### 2. Reverse Proxy (Server-Side Proxy)
+
+Internet → Proxy → Backend Servers
+
+```text
+Web Architecture:
+
+Internet
+    ↓
+Nginx Reverse Proxy (public IP)
+    ↓ Routes to backend
+    ├─ App Server 1 (private IP)
+    ├─ App Server 2 (private IP)
+    └─ App Server 3 (private IP)
+```
+
+**Characteristics:**
+- Client is **unaware** of the proxy (thinks it's talking to the backend)
+- Proxy acts on behalf of **servers**
+- **Use cases:** Load balancing, SSL termination, security
+
+---
+
+###### 3. Transparent Proxy (Intercepting Proxy)
+
+Traffic is **intercepted** without client/server awareness.
+
+```text
+ISP Network:
+
+User PC
+    ↓ Thinks it's direct connection
+Router (Transparent Proxy)
+    ↓ Intercepts traffic
+Internet
+```
+
+**Characteristics:**
+- No configuration needed
+- Uses packet interception (iptables REDIRECT, policy routing)
+- **Use cases:** ISP content filtering, corporate monitoring
+
+---
+
+###### 4. NAT/PAT (Network Address Translation / Port Address Translation)
+
+Rewrites IP addresses and ports in packet headers.
+
+```text
+Home Network:
+
+Devices (192.168.1.x)
+    ↓
+Home Router (NAT)
+    ↓ Translates to single public IP
+Internet (203.45.67.89)
+```
+
+**Characteristics:**
+- **Stateful:** Tracks connections in a table
+- Allows many private IPs to share one public IP
+- **Unidirectional:** Works for outbound-initiated traffic
+
+---
+
+##### What Type of Proxy is VPNKit?
+
+VPNKit is a **hybrid user-space network stack proxy** with characteristics of:
+
+1. **Transparent proxy:** Intercepts all VM traffic without container awareness
+2. **Forward proxy:** Acts on behalf of containers for outbound requests
+3. **NAT gateway:** Translates VM IPs to host IP
+4. **Application-layer proxy:** Understands and reconstructs protocols
+
+**Key distinction:** VPNKit operates at **multiple layers** of the network stack, performing sophisticated packet reconstruction.
+
+---
+
+#### VPNKit's Features and Design Philosophy
+
+##### Why VPNKit Exists: The Corporate Network Problem
+
+**Scenario:** Many users run Docker Desktop on corporate laptops that:
+- Are behind corporate **VPNs** (e.g., Cisco AnyConnect, GlobalProtect)
+- Must go through **HTTP proxies** (e.g., Squid, Zscaler)
+- Have **restrictive firewall rules**
+- Use **split-tunnel VPNs** (some traffic direct, some through VPN)
+
+**Traditional VM networking would fail:**
+
+```text
+Without VPNKit:
+
+Container → VM network → Hyper-V virtual switch → Windows → Corporate VPN?
+
+Problem: VM traffic doesn't respect Windows VPN routes!
+  - Packets from VM bypass VPN
+  - Corporate proxy not used
+  - DNS doesn't work (corporate internal DNS)
+  - Firewall blocks VM's IP range
+```
+
+**VPNKit's solution:** Make container traffic **appear to originate from the Windows host**.
+
+---
+
+#### **VPNKit's Architecture and Operation**
+
+```text
+┌────────────────────────────────────────────────────────┐
+│            Windows Host (192.168.1.100)                │
+│                                                        │
+│  ┌──────────────────────────────────────────────┐    │
+│  │         vpnkit.exe (User Process)            │    │
+│  │                                              │    │
+│  │  • Reads packets from shared memory          │    │
+│  │  • Reconstructs network protocols            │    │
+│  │  • Changes source IP to Windows host         │    │
+│  │  • Uses Windows network stack                │    │
+│  │  • Respects VPN routes                       │    │
+│  │  • Uses configured HTTP proxies              │    │
+│  │  • Performs DNS via Windows resolver         │    │
+│  └────────────┬─────────────────────────────────┘    │
+│               │                                        │
+│               ├─ HTTP Proxy (if configured)           │
+│               ├─ Corporate VPN (if active)            │
+│               └─ Windows Firewall (passes through)    │
+│                                                        │
+└───────────────┼────────────────────────────────────────┘
+                │ Shared Memory Channel (Hyper-V)
+                ↓
+┌────────────────────────────────────────────────────────┐
+│              WSL 2 Linux VM                            │
+│                                                        │
+│  ┌──────────────────────────────────────────────┐    │
+│  │     VPNKit Client (inside VM)                │    │
+│  │                                              │    │
+│  │  • Intercepts all VM traffic                 │    │
+│  │  • Writes packets to shared memory           │    │
+│  │  • Reads responses from shared memory        │    │
+│  └────────────┬─────────────────────────────────┘    │
+│               │                                        │
+│  ┌────────────▼─────────────────────────────────┐    │
+│  │     Containers                                │    │
+│  │  (Believe they have normal network access)    │    │
+│  └──────────────────────────────────────────────┘    │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### **VPNKit Packet Reconstruction Process**
+
+**Scenario:** Container makes HTTP request to `example.com`
+
+```text
+Step 1: Container generates packet
+  Container (10.0.1.5)
+    ↓
+  HTTP GET http://example.com/
+    ↓
+  TCP packet:
+    Source: 10.0.1.5:54321
+    Dest:   93.184.216.34:80 (example.com)
+```
+
+**Step 2:** Packet routed to VM network — Docker Engine forwards to VM's network stack.
+
+**Step 3:** VPNKit client intercepts — iptables rule redirects to VPNKit process. Packet captured before leaving VM.
+
+**Step 4:** Write to shared memory:
+
+```text
+  Serialize packet data
+    ↓
+  Write to Hyper-V shared memory buffer
+    ↓
+  Signal vpnkit.exe (Windows side)
+```
+
+**Step 5:** vpnkit.exe reads packet:
+
+```text
+  Deserialize packet from shared memory
+    ↓
+  Parse protocol stack:
+    - Ethernet frame
+    - IP packet
+    - TCP segment
+    - HTTP request
+```
+
+**Step 6:** Protocol reconstruction — VPNKit **rebuilds** the request as if from Windows:
+
+```text
+  Original packet:
+    Source IP: 10.0.1.5
+    Source Port: 54321
+
+  Reconstructed connection:
+    Source IP: 192.168.1.100  ← Windows host IP!
+    Source Port: 61234        ← New ephemeral port
+
+  Maintains mapping:
+    10.0.1.5:54321 ↔ 192.168.1.100:61234
+```
+
+**Step 7:** Use Windows network stack — vpnkit.exe creates a **real Windows socket**:
+
+```text
+  Makes connection using Windows APIs:
+    - Respects Windows routing table
+    - Uses active VPN tunnel
+    - Goes through HTTP proxy (if configured)
+    - Uses Windows DNS resolver
+    ↓
+  Request reaches example.com:
+    Appears to come from 192.168.1.100
+    (Corporate firewall allows it ✓)
+```
+
+**Step 8:** Response returns — Windows socket receives response, vpnkit.exe receives data.
+
+**Step 9:** Reverse mapping:
+
+```text
+  Lookup original connection:
+    192.168.1.100:61234 → 10.0.1.5:54321
+    ↓
+  Reconstruct response packet:
+    Dest IP: 10.0.1.5
+    Dest Port: 54321
+```
+
+**Step 10:** Write response to shared memory:
+
+```text
+  Serialize response packet
+    ↓
+  Write to shared memory buffer
+    ↓
+  Signal VM
+```
+
+**Step 11:** VPNKit client delivers — Read from shared memory → inject into VM network stack → container receives response.
+
+**Step 12:** Container receives response — Container sees normal HTTP response (unaware of all the proxying).
+
+---
+
+##### The Critical Design Decision: Source IP Rewriting
+
+**Why this is essential for VPNKit:**
+
+```text
+Corporate Network Scenario:
+
+Windows host (192.168.1.100)
+  ├─ Connected to Corporate VPN
+  ├─ Has route: 10.0.0.0/8 via VPN tunnel
+  └─ Has route: 0.0.0.0/0 via internet
+
+Container packet with source 10.0.1.5:
+  ├─ Corporate firewall sees: 10.0.1.5
+  ├─ Not in allowed IP range!
+  └─ Firewall DROPS packet ✗
+
+VPNKit-rewritten packet with source 192.168.1.100:
+  ├─ Corporate firewall sees: 192.168.1.100
+  ├─ Recognized as legitimate employee laptop
+  └─ Firewall ALLOWS packet ✓
+```
+
+**This is a HUGE RED FLAG for Docker Swarm.**
+
+---
+
+#### Why VPNKit Cannot Handle VXLAN / Swarm Traffic
+
+##### Problem 1: VXLAN is Not Just Another UDP Packet
+
+**VPNKit's protocol reconstruction works for:**
+- **HTTP/HTTPS:** Application-layer protocol, easy to parse and reconstruct
+- **DNS:** Simple request-response protocol
+- **TCP:** Connection-oriented, state can be tracked
+- **UDP (simple):** Stateless protocols like DNS queries
+
+**VXLAN is fundamentally different:**
+
+```text
+VXLAN Packet Structure:
+
+Outer Headers (Created by Docker Engine):
+  ├─ Ethernet: Source MAC (VM NIC), Dest MAC (remote VTEP)
+  ├─ IP: Source (172.20.144.5), Dest (192.168.1.200 - remote worker)
+  ├─ UDP: Source Port (random), Dest Port (4789)
+  └─ VXLAN Header: VNI (4097), Flags
+
+Inner Packet (Original container packet):
+  ├─ Ethernet: Source MAC (container-1), Dest MAC (container-2)
+  ├─ IP: Source (10.0.1.5), Dest (10.0.1.7)
+  └─ TCP/Application Data
+```
+
+**VPNKit's challenge:**
+
+1. **Nested encapsulation:** VXLAN contains a **complete Ethernet frame** inside UDP payload
+2. **MAC addresses matter:** Inner MACs are container MACs, not VM MACs
+3. **VNI significance:** VXLAN Network Identifier must be preserved
+4. **VTEP semantics:** Destination IP (`192.168.1.200`) is another VTEP, not an application server
+
+---
+
+##### Why Source IP Rewriting Breaks VXLAN
+
+```text
+Original VXLAN packet (from Docker Swarm):
+  Outer Source IP: 172.20.144.5 (VM's IP)
+  Outer Dest IP: 192.168.1.200 (remote worker's VTEP)
+  UDP Port: 4789
+  VNI: 4097
+  Inner packet: Container-1 → Container-2
+
+If VPNKit rewrites source IP:
+  Outer Source IP: 192.168.1.100 (Windows host IP)  ← Changed!
+  Outer Dest IP: 192.168.1.200
+  UDP Port: 4789
+  VNI: 4097
+  Inner packet: Container-1 → Container-2
+
+Problem at remote worker (192.168.1.200):
+  ├─ Receives VXLAN packet
+  ├─ Checks source VTEP: 192.168.1.100
+  ├─ Gossip database says: VTEP for VNI 4097 should be 172.20.144.5
+  ├─ Source doesn't match! (192.168.1.100 ≠ 172.20.144.5)
+  └─ Packet DROPPED or FDB entry corrupted ✗
+```
+
+**VXLAN requires source IP to be the VTEP IP:**
+- FDB mappings depend on source IP being the actual VTEP
+- Changing source IP breaks the VXLAN topology
+- Remote nodes can't send return traffic (don't know real VTEP)
+
+---
+
+##### Problem 2: VXLAN Requires Bidirectional Communication
+
+```text
+Swarm Operation (VXLAN):
+
+worker-1 (192.168.1.200) ←→ Docker Desktop VM (172.20.144.5)
+           ↕
+      UDP:4789 (VXLAN)
+      Bidirectional, peer-to-peer
+```
+
+**VPNKit is designed for:**
+- **Outbound-initiated** connections (VM → internet)
+- **Request-response** patterns (client → server → client)
+- **Client role** for the VM
+
+**VPNKit cannot handle:**
+- **Unsolicited inbound** VXLAN packets from worker-1
+- **Peer-to-peer** VXLAN tunnels
+- **Server role** for VXLAN VTEP
+
+Even if worker-1 tried to send VXLAN to `192.168.1.100` (Windows host), VPNKit would:
+1. Receive UDP packet on port 4789
+2. Not know how to route it to the VM
+3. No port forwarding rule exists for 4789 → VM
+4. Packet dropped
+
+---
+
+##### Problem 3: Gossip Protocol Uses Multicast/Broadcast Patterns
+
+Swarm's gossip protocol (SWIM) uses **peer-to-peer UDP** on port 7946:
+
+```text
+Gossip Operation:
+
+worker-1 spontaneously sends to worker-2:
+  "Health check: Are you alive?"
+  UDP: 192.168.1.200:7946 → 172.20.144.5:7946
+
+worker-2 spontaneously sends to worker-3:
+  "Membership update: worker-4 joined"
+  UDP: 172.20.144.5:7946 → 192.168.1.220:7946
+```
+
+**This is:**
+- **Bidirectional** (any node can initiate to any other)
+- **Unsolicited** (no prior request)
+- **Low-level UDP** (not HTTP/TCP that VPNKit handles well)
+
+**VPNKit's packet reconstruction:**
+- Works for **TCP streams** (connection-oriented)
+- Works for **request-response UDP** (DNS)
+- **Fails for peer-to-peer UDP** (gossip, VXLAN)
+
+---
+
+#### Shared Memory Channel: How VPNKit Communicates with VM
+
+**Shared memory** is an IPC (Inter-Process Communication) mechanism allowing processes to access the same memory region.
+
+##### Hyper-V Socket (hvsock) Implementation
+
+Hyper-V provides a **high-performance, low-latency** communication channel between host and VM:
+
+```text
+T=3: Write to shared memory
+  Check write pointer position
+  Write serialized packet data
+  Update write pointer
+
+T=4: Signal host process
+  Write to semaphore
+  Host vpnkit.exe wakes up
+
+T=5: vpnkit.exe reads
+  Check write pointer (new data available)
+  Read packet data from buffer
+  Update read pointer
+
+T=6: vpnkit.exe processes
+  Deserialize packet
+  Reconstruct as Windows socket
+  Send via Windows network stack
+
+T=7: Response returns (reverse process)
+  vpnkit.exe receives response
+  Serialize response
+  Write to shared memory
+  Signal VM
+
+T=8: VPNKit client delivers response
+  Read from shared memory
+  Inject into VM network stack
+  Container receives response
+```
+
+**Performance:**
+- **Low latency:** ~microseconds for IPC (memory copy)
+- **High throughput:** Limited by memory bandwidth, not network
+- **Zero-copy:** Hyper-V can optimize to avoid some copies
+- **Efficient:** Avoids context switches of traditional IPC
+
+---
+
+### Synthesis: Why Docker Swarm Cannot Work on Docker Desktop
+
+#### Condition 1: Routable IP Address
+
+**Swarm needs:** Stable, routable IP that other nodes can reach
+
+**Docker Desktop provides:** Ephemeral, non-routable VM IP (`172.20.144.5`) behind NAT
+
+**Why it fails:**
+- VM IP changes on restart
+- VM IP not reachable from physical network
+- VPNKit doesn't provide routable IP, only outbound proxying
+- Cannot install VPN (like Tailscale) inside Docker Desktop's managed VM due to its read-only filesystem
+
+**Verdict:** ❌ **IMPOSSIBLE**
+
+---
+
+#### Condition 2: Exposed Docker Engine Ports
+
+**Swarm needs:** Ports 2377, 7946, 4789 exposed on Docker Engine (not containers)
+
+**Docker Desktop provides:** Port forwarding for container ports only
+
+**Why it fails:**
+- Port forwarding is designed for container ports, not Docker Engine
+- Even if manually configured, points to ephemeral VM IP
+- VPNKit interferes with low-level port forwarding
+- Unsolicited inbound connections (gossip, VXLAN) don't work with NAT
+
+**Verdict:** ❌ **IMPOSSIBLE**
+
+---
+
+#### Condition 3: Bidirectional, Peer-to-Peer Communication
+
+**Swarm needs:** Any node can spontaneously communicate with any other node
+
+**Docker Desktop provides:** Outbound-only proxying via VPNKit
+
+**Why it fails:**
+
+**Port 2377 (Cluster Management - TCP):**
+- Requires inbound connections for worker → manager communication
+- VPNKit only handles outbound TCP well
+- NAT state table doesn't support unsolicited inbound
+- **Partial failure:** Might work for manager-initiated connections, fails for worker-initiated
+
+**Port 7946 (Gossip - TCP + UDP):**
+- Peer-to-peer, bidirectional gossip protocol
+- Nodes randomly select peers to gossip with
+- VPNKit's source IP rewriting breaks peer discovery
+- UDP gossip doesn't fit request-response pattern
+- **Complete failure:** Gossip protocol fundamentally incompatible
+
+**Port 4789 (VXLAN - UDP):**
+- Requires specific source IP (VTEP IP) to be preserved
+- VPNKit rewrites source IP to Windows host IP
+- Breaks VXLAN topology and FDB entries
+- Nested encapsulation (MAC-in-UDP) confuses VPNKit
+- Remote nodes can't send return VXLAN traffic
+- **Complete failure:** VXLAN cannot function through VPNKit
+
+**Verdict:** ❌ **IMPOSSIBLE**
+
+---
+
+### Conclusion: Architectural Mismatch
+
+Docker Desktop's architecture is **fundamentally designed** for:
+- **Single-node development** environments
+- **Outbound-initiated** network connections (containers accessing internet/APIs)
+- **Request-response** communication patterns (HTTP, databases)
+- **Corporate network compatibility** (VPNs, proxies)
+
+Docker Swarm's architecture **fundamentally requires**:
+- **Multi-node clustering** with direct node-to-node communication
+- **Bidirectional, peer-to-peer** network connections
+- **Low-level networking** (VXLAN tunnels, gossip protocols)
+- **Stable, routable IP addresses** for each node
+
+**These requirements are diametrically opposed.**
+
+VPNKit's design decision to **rewrite source IPs** (essential for corporate VPN compatibility) directly conflicts with VXLAN's requirement for **source IP to be the VTEP address**.
+
+The **read-only filesystem of Docker Desktop's managed VM** prevents installing Tailscale inside it to provide routable IPs. (A separate WSL2 Ubuntu distro does not have this restriction — which is exactly why the solution involves installing both Docker Engine and Tailscale there instead.)
+
+The **ephemeral, NAT-isolated VM IP** means the node cannot be addressed by other swarm nodes.
+
+**Therefore, Docker Swarm on Docker Desktop is not just difficult—it is architecturally impossible without fundamentally redesigning Docker Desktop's networking model, which would break its core value proposition of seamless corporate network integration.**
+
+For Docker Swarm, use:
+- **Linux servers** with native Docker Engine (physical or VMs with bridged networking)
+- **Cloud VMs** (AWS EC2, GCP Compute Engine, Azure VMs) with public/VPC IPs
+- **Linux Docker Engine on WSL 2** (bypassing Docker Desktop entirely, with Tailscale for routable IPs)
+
+Docker Desktop remains excellent for **local development and testing**, but swarm clustering requires proper Linux infrastructure with real, routable network connectivity.
+
+---
+
+## 5. The Solution: Docker Swarm Over Tailscale
+
+We now know exactly why Docker Desktop fails and what Swarm actually needs. The solution is to sidestep Docker Desktop entirely and give each machine two things that live in the **same Linux network namespace**:
+
+1. **Docker Engine** — running directly in WSL2 Ubuntu (not the `docker-desktop` distro)
+2. **Tailscale** — running in that same WSL2 Ubuntu, creating a real `tailscale0` interface there
+
+With both in the same namespace, `docker swarm init --advertise-addr $(tailscale ip -4)` just works. Docker can bind to the Tailscale IP, VXLAN packets go through the kernel WireGuard tunnel, and the gossip protocol reaches every node.
+
+The encapsulation stack looks like this:
+
+```
+App data
+  ↓  Container IP packet:  [IP: 10.0.1.2 → 10.0.1.3][TCP/UDP][Data]
+  ↓  VXLAN encapsulation:  [UDP:4789][VXLAN Header][Container Packet]
+  ↓  WireGuard encryption: [UDP:41641][WireGuard Encrypted Payload]
+  ↓  Windows NAT:          [Public IP][WireGuard Packet] → Internet
+```
+
+Windows NAT only ever sees the outermost UDP packet. Everything inside — VXLAN headers, container IPs, app data — is encrypted and opaque. That's why NAT doesn't break it.
+
+---
+
+### 5A. Prerequisites: Install Docker Engine & Tailscale
+
+Run the following on **every machine** that will join the swarm.
+
+#### Install Docker Engine
+
+> **Do not use Docker Desktop.** Install Docker Engine directly into WSL2 Ubuntu (or your Linux machine).
+
+```bash
+# Remove any old installations
+sudo apt remove docker docker-engine docker.io containerd runc
+
+# Install dependencies
+sudo apt update
+sudo apt install -y ca-certificates curl gnupg lsb-release
+
+# Add Docker's official GPG key
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+# Add the repository
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Start and enable
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# Allow your user to run docker without sudo
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+Verify:
+
+```bash
+docker --version
+docker ps   # Should return empty list, no errors
+```
+
+#### Install Tailscale
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+
+Connect to your tailnet and authenticate:
+
+```bash
+sudo tailscale up
+# Follow the authentication URL printed in the terminal
+```
+
+Get your Tailscale IP — this is what everything else will use:
+
+```bash
+tailscale ip -4
+# e.g. 100.101.102.103
+```
+
+---
+
+### 5B. Verify Tailscale Connectivity Between Machines
+
+Before touching Swarm, confirm the two machines can actually reach each other through Tailscale. Do this from both sides.
+
+```bash
+# From Machine A — ping Machine B's Tailscale IP
+ping -c 4 <MACHINE_B_TAILSCALE_IP>
+
+# From Machine B — ping Machine A's Tailscale IP
+ping -c 4 <MACHINE_A_TAILSCALE_IP>
+```
+
+Check the connection type (direct peer-to-peer vs DERP relay):
+
+```bash
+tailscale status
+# Example output:
+# 100.101.102.103  machine-b  direct  ← Direct P2P connection (ideal)
+# 100.101.102.104  machine-c  relay   ← Via DERP relay (still works, slightly higher latency)
+```
+
+Direct connections are faster, but relay connections work fine for Swarm. Tailscale handles NAT traversal automatically — you don't need to configure anything for this.
+
+---
+
+### 5C. Open the Required Ports
+
+Swarm uses three ports for its internal protocols. These need to be open on every node:
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 2377 | TCP | Raft cluster management (manager ↔ manager, worker → manager) |
+| 7946 | TCP + UDP | SWIM gossip protocol (mesh, all nodes) |
+| 4789 | UDP | VXLAN overlay traffic |
+
+#### On Linux machines with UFW
+
+```bash
+sudo ufw allow 2377/tcp
+sudo ufw allow 7946/tcp
+sudo ufw allow 7946/udp
+sudo ufw allow 4789/udp
+```
+
+#### On cloud VMs (e.g. GCP, AWS)
+
+Create a firewall rule that allows these ports **only from the Tailscale IP range** (`100.64.0.0/10`). There's no need to expose Swarm ports to the public internet — all Swarm traffic will travel through the Tailscale tunnel.
+
+```bash
+# GCP example (run from local machine with gcloud installed)
+gcloud compute firewall-rules create allow-docker-swarm \
+  --network=default \
+  --allow=tcp:2377,tcp:7946,udp:7946,udp:4789 \
+  --source-ranges=100.64.0.0/10 \
+  --target-tags=docker-swarm \
+  --description="Docker Swarm ports via Tailscale only"
+```
+
+---
+
+### 5D. MTU Configuration
+
+Tailscale automatically sets the MTU of the `tailscale0` interface to **1280 bytes**. Verify this on both machines:
+
+```bash
+ip link show tailscale0 | grep mtu
+# Expected: ... mtu 1280 ...
+```
+
+Here's how the MTU budget stacks up:
+
+```
+Tailscale interface MTU:         1280 bytes
+  − WireGuard/UDP overhead:        60 bytes
+Usable payload for inner packet: 1220 bytes
+
+Docker overlay (VXLAN) overhead:  50 bytes
+Effective container MTU:         ~1170 bytes
+```
+
+This means Docker's overlay network operates safely within Tailscale's MTU without any fragmentation. You do **not** need to manually configure Docker's MTU — the kernel handles the math.
+
+You can verify there are no fragmentation issues by testing with a fixed-size ping:
+
+```bash
+# 1280 - 28 (IP + ICMP headers) = 1252 byte payload
+# -M do = don't fragment flag
+ping -M do -s 1252 -c 4 <OTHER_MACHINE_TAILSCALE_IP>
+# All 4 packets should succeed
+
+ping -M do -s 1400 -c 2 <OTHER_MACHINE_TAILSCALE_IP>
+# This should fail with "Message too long" — expected
+```
+
+---
+
+### 5E. Initialize the Swarm
+
+Pick one machine as the **manager node** and run:
+
+```bash
+# Get your Tailscale IP
+MANAGER_IP=$(tailscale ip -4)
+echo "Manager Tailscale IP: $MANAGER_IP"
+
+# Initialize Swarm, advertising the Tailscale IP
+docker swarm init --advertise-addr $MANAGER_IP
+```
+
+You'll see output like:
+
+```
+Swarm initialized: current node (abc123def456) is now a manager.
+
+To add a worker to this swarm, run the following command:
+
+    docker swarm join --token SWMTKN-1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 100.101.102.103:2377
+
+To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
+```
+
+Copy the full `docker swarm join` command — you'll need it in the next step.
+
+Confirm what address Swarm advertised (it should be your Tailscale IP, not `192.168.65.x`):
+
+```bash
+docker node inspect self --format '{{ .Status.Addr }}'
+# Expected: 100.101.102.103  ← Tailscale IP, routable everywhere
+```
+
+---
+
+### 5F. Join Worker Nodes
+
+On each additional machine, paste the join command from the previous step:
+
+```bash
+docker swarm join --token SWMTKN-1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 100.101.102.103:2377
+# Expected output: This node joined a swarm as a worker.
+```
+
+Back on the manager, verify all nodes are visible:
+
+```bash
+docker node ls
+```
+
+```
+ID                            HOSTNAME         STATUS    AVAILABILITY   MANAGER STATUS
+abc123def456 *                machine-a        Ready     Active         Leader
+xyz789ghi012                  machine-b        Ready     Active
+```
+
+Both nodes show `Ready` and `Active`. The `*` marks the current node. The cluster is live.
+
+---
+
+### 5G. Deploy and Verify
+
+#### Test 1: Service distributes across nodes
+
+```bash
+# Create a service with more replicas than nodes
+docker service create \
+  --name web-test \
+  --replicas 4 \
+  --publish published=8080,target=80 \
+  nginx:alpine
+
+# Watch it deploy
+docker service ps web-test
+```
+
+```
+ID            NAME          IMAGE         NODE        DESIRED STATE   CURRENT STATE
+aaa111        web-test.1    nginx:alpine  machine-a   Running         Running
+bbb222        web-test.2    nginx:alpine  machine-b   Running         Running
+ccc333        web-test.3    nginx:alpine  machine-a   Running         Running
+ddd444        web-test.4    nginx:alpine  machine-b   Running         Running
+```
+
+Containers are distributed across both nodes. Docker's routing mesh means you can `curl http://localhost:8080` on **either** machine and reach any replica — even ones on the other node.
+
+```bash
+curl http://localhost:8080 | grep -o "Welcome to nginx"
+# Welcome to nginx
+```
+
+#### Test 2: Overlay network and service discovery
+
+This test confirms that containers on different nodes can find and talk to each other by **name** through the overlay network — the core feature that makes Swarm useful for real applications.
+
+```bash
+# Create a custom overlay network
+docker network create --driver overlay --attachable app-network
+
+# Deploy a Redis instance on it
+docker service create \
+  --name redis \
+  --replicas 1 \
+  --network app-network \
+  redis:alpine
+
+# Deploy a frontend that uses redis
+docker service create \
+  --name webapp \
+  --replicas 3 \
+  --network app-network \
+  --publish published=8080,target=80 \
+  nginx:alpine
+```
+
+Get into one of the `webapp` containers and test service discovery:
+
+```bash
+CONTAINER_ID=$(docker ps --filter "name=webapp" -q | head -1)
+docker exec -it $CONTAINER_ID sh
+
+# Inside the container:
+apk add redis   # install redis-cli
+redis-cli -h redis ping
+# PONG
+```
+
+`PONG` confirms: the `webapp` container resolved the name `redis` via Docker's overlay DNS, reached the `redis` container (potentially running on the **other node**, across the Tailscale tunnel), and got a response. That's VXLAN-over-WireGuard working end-to-end.
+
+---
+
+### 5H. Cleanup
+
+```bash
+# Remove services
+docker service rm web-test webapp redis
+
+# Remove custom network
+docker network rm app-network
+
+# On worker machines — leave the swarm
+docker swarm leave
+
+# On manager — remove downed nodes, then dismantle
+docker node rm <WORKER_NODE_ID>
+docker swarm leave --force
+
+# Prune all unused Docker resources
+docker system prune -a --volumes -f
+```
