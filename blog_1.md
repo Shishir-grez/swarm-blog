@@ -1,4 +1,6 @@
-Here's a technical explanation of NAT without analogies:
+Before we dive into how Tailscale magically connects your machines, we need to understand the fundamental problem it solves. To do that, we have to look closely at NAT (Network Address Translation) and how it handles traffic.
+
+---
 
 ---
 
@@ -33,7 +35,7 @@ These addresses are:
 
 ### What NAT Actually Does to Packets
 
-#### Outbound Traffic (Private → Public)
+#### Outbound Traffic (Private -> Public)
 
 **Original packet (from your device):**
 ```text
@@ -91,7 +93,7 @@ The router maintains a state table mapping internal addresses to external ports:
   - UDP: typically 30-60 seconds
   - ICMP: typically 30 seconds
 
-#### Inbound Traffic (Public → Private)
+#### Inbound Traffic (Public -> Private)
 
 **Incoming packet (response from internet):**
 ```text
@@ -112,7 +114,7 @@ The router maintains a state table mapping internal addresses to external ports:
 1. Router receives packet destined for its public IP
 2. Examines destination port (61234)
 3. Searches NAT table for matching external port
-4. Finds entry: `61234 → 192.168.1.10:54321`
+4. Finds entry: `61234 -> 192.168.1.10:54321`
 5. Performs reverse translation
 
 **After reverse NAT translation:**
@@ -136,13 +138,13 @@ The router maintains a state table mapping internal addresses to external ports:
 3. Recalculate checksums
 4. Forward packet to internal network
 
-### Why Port Numbers Are Essential
+### How NAT Supports Multiple Internal Devices (The Role of Ports)
 
 **Multiple devices sharing one public IP:**
 
 ```
-Device A (192.168.1.10) requests YouTube: 192.168.1.10:54321 → 142.250.80.46:443
-Device B (192.168.1.11) requests YouTube: 192.168.1.11:49152 → 142.250.80.46:443
+Device A (192.168.1.10) requests YouTube: 192.168.1.10:54321 -> 142.250.80.46:443
+Device B (192.168.1.11) requests YouTube: 192.168.1.11:49152 -> 142.250.80.46:443
 
 Both destinations are identical (same server, same port)
 Both appear to come from the same public IP (203.45.67.89)
@@ -150,14 +152,14 @@ Both appear to come from the same public IP (203.45.67.89)
 
 **NAT assigns unique external ports:**
 ```
-Device A: 192.168.1.10:54321 → NAT → 203.45.67.89:61234 → YouTube
-Device B: 192.168.1.11:49152 → NAT → 203.45.67.89:61235 → YouTube
+Device A: 192.168.1.10:54321 -> NAT -> 203.45.67.89:61234 -> YouTube
+Device B: 192.168.1.11:49152 -> NAT -> 203.45.67.89:61235 -> YouTube
 ```
 
 **When responses arrive:**
 ```
-YouTube → 203.45.67.89:61234 → NAT table lookup → 192.168.1.10:54321 (Device A)
-YouTube → 203.45.67.89:61235 → NAT table lookup → 192.168.1.11:49152 (Device B)
+YouTube -> 203.45.67.89:61234 -> NAT table lookup -> 192.168.1.10:54321 (Device A)
+YouTube -> 203.45.67.89:61235 -> NAT table lookup -> 192.168.1.11:49152 (Device B)
 ```
 
 The external port number is the **only identifier** that allows the router to determine which internal device should receive the response.
@@ -180,10 +182,10 @@ Internal device 192.168.1.10:5000 sends to 8.8.8.8:53
 Creates mapping: 192.168.1.10:5000 ↔ 203.45.67.89:61234
 
 Allowed inbound:
-✅ 8.8.8.8:* → 203.45.67.89:61234 (any port from 8.8.8.8)
+✅ 8.8.8.8:* -> 203.45.67.89:61234 (any port from 8.8.8.8)
 
 Blocked inbound:
-❌ 1.1.1.1:* → 203.45.67.89:61234 (different IP)
+❌ 1.1.1.1:* -> 203.45.67.89:61234 (different IP)
 ```
 
 #### 3. Port Restricted Cone NAT
@@ -192,26 +194,26 @@ Internal device 192.168.1.10:5000 sends to 8.8.8.8:53
 Creates mapping: 192.168.1.10:5000 ↔ 203.45.67.89:61234
 
 Allowed inbound:
-✅ 8.8.8.8:53 → 203.45.67.89:61234 (exact IP:port match)
+✅ 8.8.8.8:53 -> 203.45.67.89:61234 (exact IP:port match)
 
 Blocked inbound:
-❌ 8.8.8.8:80 → 203.45.67.89:61234 (same IP, different port)
-❌ 1.1.1.1:53 → 203.45.67.89:61234 (different IP)
+❌ 8.8.8.8:80 -> 203.45.67.89:61234 (same IP, different port)
+❌ 1.1.1.1:53 -> 203.45.67.89:61234 (different IP)
 ```
 
 #### 4. Symmetric NAT
 ```
-Same internal source, different destinations → different external ports
+Same internal source, different destinations -> different external ports
 
-192.168.1.10:5000 → 8.8.8.8:53    NAT assigns external port 61234
-192.168.1.10:5000 → 1.1.1.1:53    NAT assigns external port 61235
+192.168.1.10:5000 -> 8.8.8.8:53    NAT assigns external port 61234
+192.168.1.10:5000 -> 1.1.1.1:53    NAT assigns external port 61235
 
 Each unique (internal_ip:port, remote_ip:port) tuple gets a unique external port
 ```
 
-### The Unsolicited Inbound Connection Problem
+### The Inbound Connection Blocking Problem (Applicable to Cone & Symmetric NAT)
 
-**What happens when an external host tries to initiate a connection:**
+**What happens when an external host tries to initiate a connection without port forwarding:**
 
 ```
 Step 1: External host (1.2.3.4) sends packet to your public IP
@@ -230,41 +232,30 @@ Step 5: Packet dropped (discarded)
 
 **Why the packet is dropped:**
 - NAT table entries only exist for connections initiated from inside
-- Router has no mapping for port 5000 → internal device
+- Router has no mapping for port 5000 -> internal device
 - Even if there's only one internal device, the router doesn't forward unmapped ports
 - This behavior is by design (security feature + ambiguity prevention)
 
 **The fundamental issue:**
-- Outbound-initiated traffic: NAT table entry exists → translation works
-- Inbound-initiated traffic: No NAT table entry → no destination → dropped
+- Outbound-initiated traffic: NAT table entry exists -> translation works
+- Inbound-initiated traffic: No NAT table entry -> no destination -> dropped
+- **Note:** You only get unsolicited traffic replies automatically on **Full Cone NAT** (Case 1) or if you've manually configured **Port Forwarding**. The other three NAT types will block it by default.
 
-### NAT and Connection State
+### NAT and Connection State: TCP vs UDP
 
-**TCP connection tracking:**
-```
-Outbound SYN:    192.168.1.10:54321 → 8.8.8.8:443
-  NAT creates:   Entry in SYN_SENT state
-  
-Inbound SYN-ACK: 8.8.8.8:443 → 203.45.67.89:61234
-  NAT updates:   Entry to ESTABLISHED state
-  
-Subsequent:      Bidirectional traffic allowed
-  NAT tracks:    Packet counts, last activity time
-  
-Connection close or timeout:
-  NAT removes:   Table entry deleted
-```
+**TCP (Stateful Tracking):**
+Because TCP has a formal handshake (SYN, SYN-ACK, ACK), the NAT router clearly understands the connection state.
+- **Outbound SYN:** Router creates a temporary mapping in `SYN_SENT` state.
+- **Inbound SYN-ACK:** Router updates mapping to `ESTABLISHED`.
+- **Bidirectional:** Traffic flows freely. When the connection closes (FIN/RST), the mapping is removed.
 
-**UDP (connectionless) tracking:**
-```
-Outbound packet: 192.168.1.10:54321 → 8.8.8.8:53
-  NAT creates:   Entry with short timeout (30-60s)
-  
-Inbound packet:  8.8.8.8:53 → 203.45.67.89:61234
-  NAT refreshes: Timeout reset
-  
-No activity:     Entry expires after timeout
-```
+**UDP (Connectionless Tracking):**
+UDP does not have handshakes or formal "connections". However, NAT still creates temporary state mappings to allow return traffic.
+- **Outbound Packet:** Router creates a mapping with a short timeout (typically 30-60 seconds).
+- **Inbound Packet:** If return traffic arrives within the timeout, it passes through and resets the timer.
+- **No Activity:** The mapping expires and the "hole" closes.
+
+This temporary UDP mapping behavior is crucial because Tailscale (via WireGuard) relies on UDP for its encrypted tunnels.
 
 ### What NAT Does NOT Do
 
@@ -274,8 +265,9 @@ No activity:     Entry expires after timeout
 - Internal devices can still be compromised through outbound connections
 
 ❌ **Does not allow inbound connections by default**
-- Requires manual configuration (port forwarding, UPnP)
-- Or NAT traversal techniques (STUN, TURN, ICE)
+- Requires manual configuration like **Port Forwarding**, which manually creates a permanent inbound mapping.
+- While port forwarding helps simple client-server apps, it is a poor fit for Swarm's peer-to-peer mesh because every node needs to talk to every other node--meaning you'd have to manage complex port forwarding rules on multiple routers, which you often don't even control.
+- Alternatively, requires NAT traversal techniques (STUN, TURN, ICE).
 
 ❌ **Does not handle all protocols seamlessly**
 - Protocols that embed IP addresses in payload (FTP, SIP) require ALG (Application Layer Gateway)
@@ -332,7 +324,7 @@ sequenceDiagram
     Web->>NAT: Src: 8.8.8.8:443 | Dst: 203.45.67.89:61234
     
     Note over NAT: 5. NAT Table Lookup
-    Note over NAT: Port 61234 found → Internal 192.168.1.10:54321
+    Note over NAT: Port 61234 found -> Internal 192.168.1.10:54321
     
     Note over NAT: 6. Header Swapped Back
     NAT->>PC: Src: 8.8.8.8:443 | Dst: 192.168.1.10:54321
@@ -375,7 +367,16 @@ Every Tailscale client connects to Tailscale's **coordination server** (control 
 4. **Shares endpoint information** (public IPs, ports, NAT types)
 5. **Provides network policy enforcement** (ACLs, DNS configuration)
 
-**Important:** The coordination server **never sees your actual traffic**—it only facilitates the connection setup. All data transfer is peer-to-peer (or via DERP relays, explained later).
+```mermaid
+graph TD
+    A[Device A] <-->|HTTPS Auth & Status| C(Tailscale Coordination Server)
+    B[Device B] <-->|HTTPS Auth & Status| C
+    C -.->|Shares A's IP & Keys| B
+    C -.->|Shares B's IP & Keys| A
+    style C fill:#f9f,stroke:#333,stroke-width:2px
+```
+
+**Important:** The coordination server **never sees your actual traffic**--it only facilitates the connection setup. All data transfer is peer-to-peer (or via DERP relays, explained later).
 
 ---
 
@@ -389,23 +390,17 @@ Tailscale uses **STUN (Session Traversal Utilities for NAT)** servers to help de
 
 **STUN workflow:**
 
-```text
-┌────────────────┐                ┌────────────────┐
-│    Device A    │                │  STUN Server   │
-│  (Private IP)  │                │  (Public IP)   │
-└───────┬────────┘                └───────┬────────┘
-        │                                 │
-        │  1. "What's my public endpoint?"│
-        │────────────────────────────────>│
-        │                                 │
-        │  2. "You are 203.45.67.89:41234"│
-        │<────────────────────────────────│
-        │                                 │
-┌───────┴────────┐                        │
-│ Result:        │                        │
-│ A knows public │                        │
-│ IP & Map Type  │                        │
-└────────────────┘                        │
+```mermaid
+sequenceDiagram
+    participant A as Device A (Private IP)
+    participant NAT as NAT Router
+    participant STUN as STUN Server (Public IP)
+    
+    A->>NAT: "What's my public endpoint?" (Src: 192.168.1.10:5000)
+    NAT->>STUN: Forwarded (Src swapped to: 203.45.67.89:41234)
+    STUN-->>NAT: "I see you coming from 203.45.67.89:41234"
+    NAT-->>A: Forwarded to 192.168.1.10:5000
+    Note over A: Device A now knows its Public IP & mapped port!
 ```
 
 This information is shared through Tailscale's coordination server.
@@ -416,48 +411,32 @@ This information is shared through Tailscale's coordination server.
 
 **Hole punching** is a technique that exploits NAT behavior to allow direct peer-to-peer connections.
 
-#### **How Hole Punching Works**
+#### **How UDP Hole Punching Works**
 
-**The Concept:**
-When an internal device sends an outbound packet, the NAT router creates a temporary mapping (a "hole") in its firewall. If both peers send packets simultaneously to each other's public endpoints, they can create bidirectional holes that allow direct communication.
+The core idea is simple but clever:
+1. **Both peers send outbound UDP packets** to each other's known public IP addresses at the same time.
+2. **NAT devices create temporary mappings** (the "holes") expecting return traffic.
+3. **Those mappings let return packets through**. Even if the very first packets are dropped, the "holes" are now open on both routers.
+4. **Subsequent packets pass successfully**, establishing a direct, bidirectional, peer-to-peer connection.
+5. **If this fails** (due to restrictive firewalls or Symmetric NAT), Tailscale falls back to relaying encrypted packets via DERP servers.
 
-**Step-by-step process:**
-
-```text
-  Device A          Router A          Router B          Device B
-(203.45.67.89)       (NAT)             (NAT)        (198.23.45.123)
-      │                │                 │                │
-      │ T=1: Initial Simultaneous Handshake (Simulated)   │
-      │                │                 │                │
-      │── UDP Pkt ────>│                 │                │
-      │                │── (create hole) │                │
-      │                │                 │                │
-      │                │                 │<── UDP Pkt ────│
-      │                │ (create hole) ──│                │
-      │                │                 │                │
-      │ T=2: Bidirectional Flow Established               │
-      │                │                 │                │
-      │<───────────────┴─── (Direct) ────┴───────────────>│
-      │                │                 │                │
+```mermaid
+sequenceDiagram
+    participant A as Device A (Behind NAT A)
+    participant B as Device B (Behind NAT B)
+    
+    Note over A,B: Both devices get each other's Public IP from Coordination Server
+    
+    A->>B: Send UDP Packet to B's Public IP
+    Note over A: Router A creates outbound "hole" for B
+    B->>A: Send UDP Packet to A's Public IP
+    Note over B: Router B creates outbound "hole" for A
+    
+    Note over A,B: The first packets might be dropped by the receiving NAT, but the holes are now open!
+    
+    A->>B: Subsequent UDP Packets pass through Router B's open hole
+    B->>A: Subsequent UDP Packets pass through Router A's open hole
 ```
-
-**Key insight:** The initial packets from each side might be dropped, but they create the NAT mappings ("holes"). Subsequent packets flow through these holes because the NAT routers now recognize them as part of established sessions.
-
-#### **Types of Hole Punching**
-
-**1. UDP Hole Punching**
-- Most common and reliable
-- Tailscale uses WireGuard over UDP
-- Works with Cone NAT types
-- Stateless protocol makes it ideal
-
-**2. TCP Hole Punching**
-- More complex due to TCP's stateful handshake
-- Requires precise timing
-- Less commonly used by Tailscale
-
-**3. Birthday Paradox Attack (for Symmetric NAT)**
-When facing symmetric NAT, Tailscale may attempt to predict port allocation patterns by rapidly sending packets to a range of likely ports, hoping to "catch" the correct mapping.
 
 ---
 
@@ -469,7 +448,7 @@ When direct peer-to-peer connection fails (symmetric NAT, restrictive firewalls,
 
 ## **DERP Relays: The Safety Net**
 
-**DERP (Designated Encrypted Relay for Packets)** is Tailscale's custom relay protocol—their fallback mechanism when direct connections aren't possible.
+**DERP (Designated Encrypted Relay for Packets)** is Tailscale's custom relay protocol--their fallback mechanism when direct connections aren't possible.
 
 ### **What is DERP?**
 
@@ -479,34 +458,25 @@ DERP is a **relay server infrastructure** operated by Tailscale (and optionally 
 
 ### **How DERP Works**
 
-```text
-┌──────────┐          ┌─────────────┐          ┌──────────┐
-│ Device A │          │ DERP Relay  │          │ Device B │
-└────┬─────┘          └──────┬──────┘          └────┬─────┘
-     │                       │                      │
-     │ 1. Encrypted Frame    │                      │
-     │   (Dest: Key B)       │                      │
-     │──────────────────────>│                      │
-     │                       │ 2. Forward Frame     │
-     │                       │   (Dest: Device B)   │
-     │                       │─────────────────────>│
-     │                       │                      │
-     │                       │ 3. Encrypted Resp    │
-     │                       │   (Dest: Key A)      │
-     │<──────────────────────│<─────────────────────│
-     │                       │                      │
+```mermaid
+graph LR
+    A[Device A] -- Encrypted Data --> D((DERP Relay Server))
+    D -- Forwards Encrypted Data --> B[Device B]
+    B -- Encrypted Response --> D
+    D -- Forwards Response --> A
+    style D fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
 **DERP Server's View:**
 ```
 Connection Table:
-- Device A (public key: abc123...) → Connected from 203.45.67.89:41234
-- Device B (public key: def456...) → Connected from 198.23.45.123:38472
+- Device A (public key: abc123...) -> Connected from 203.45.67.89:41234
+- Device B (public key: def456...) -> Connected from 198.23.45.123:38472
 
 Incoming packet from 203.45.67.89:41234
   Destination public key: def456...
-  → Lookup: Device B
-  → Forward to: 198.23.45.123:38472
+  -> Lookup: Device B
+  -> Forward to: 198.23.45.123:38472
 ```
 
 ### **DERP Protocol Features**
@@ -531,35 +501,11 @@ To integrate into your operating system's network stack, Tailscale creates a **v
 - Used for routing IP traffic between networks
 - **Tailscale uses TUN** because it operates at the IP layer
 
-**How TUN works:**
-
-```text
-  Application       Kernel Stack       TUN Interface        Tailscale         Physical NIC
-       │                  │                  │                  │                  │
-       │ (1) Send Packet  │                  │                  │                  │
-       │─────────────────>│                  │                  │                  │
-       │                  │                  │                  │                  │
-       │                  │ (2) Route to TUN │                  │                  │
-       │                  │─────────────────>│                  │                  │
-       │                  │                  │                  │                  │
-       │                  │                  │ (3) Read IP Pkt  │                  │
-       │                  │                  │<─────────────────│                  │
-       │                  │                  │                  │                  │
-       │                  │                  │                  │ (4) Encrypt &    │
-       │                  │ (5) Send UDP Packet (via Socket)    │     Wrap in UDP  │
-       │                  │<────────────────────────────────────│                  │
-       │                  │                  │                  │                  │
-       │                  │ (6) Forward to Internet             │                  │
-       │                  │───────────────────────────────────────────────────────>│
-       │                  │                  │                  │                  │
-```
-
-**Example:**
-When you access `100.64.0.2` (a Tailscale IP):
-1. Kernel routing table directs traffic to `tailscale0` interface
-2. Tailscale process reads the IP packet from TUN
-3. Encrypts it with WireGuard
-4. Sends encrypted packet to peer (directly or via DERP)
+**How it practically works:**
+1. Tailscale creates a virtual network interface on your machine (e.g., `tailscale0`).
+2. The OS routing table is updated to route any `100.x.y.z` traffic into that virtual interface.
+3. The Tailscale process reads those packets, encrypts them using WireGuard, and sends them out over the internet (via UDP hole punching or DERP).
+4. Your applications are completely unaware of this--they just see a normal IP route to the destination.
 
 ---
 
@@ -587,9 +533,9 @@ default via 192.168.1.1 dev eth0
 ```
 
 **What this means:**
-- Traffic to `192.168.1.x` → Goes through physical interface (`eth0`)
-- Traffic to `8.8.8.8` → Goes through default gateway (internet)
-- Traffic to `100.100.100.100` → Goes through Tailscale interface (`tailscale0`)
+- Traffic to `192.168.1.x` -> Goes through physical interface (`eth0`)
+- Traffic to `8.8.8.8` -> Goes through default gateway (internet)
+- Traffic to `100.100.100.100` -> Goes through Tailscale interface (`tailscale0`)
 
 ### **Per-Peer /32 Routes**
 
@@ -627,16 +573,16 @@ You'll notice Tailscale adds **/32 routes** (individual host routes) for each pe
 
 ### **Why Tailscale Uses /32 Routes**
 
-Tailscale assigns a unique Tailscale IP to each device (e.g., `100.100.100.100`) and adds a **/32 route** for it—meaning the route applies to **exactly one IP address**.
+Tailscale assigns a unique Tailscale IP to each device (e.g., `100.100.100.100`) and adds a **/32 route** for it--meaning the route applies to **exactly one IP address**.
 
 #### **Reason 1: Precise Routing Control**
 
 With /32 routes, Tailscale can route each peer individually:
 
 ```bash
-100.64.0.5/32 dev tailscale0   → Peer A
-100.64.0.8/32 dev tailscale0   → Peer B
-100.64.0.12/32 dev tailscale0  → Peer C
+100.64.0.5/32 dev tailscale0   -> Peer A
+100.64.0.8/32 dev tailscale0   -> Peer B
+100.64.0.12/32 dev tailscale0  -> Peer C
 ```
 
 Each peer has its own routing entry, allowing granular control over:
@@ -666,7 +612,7 @@ Since each peer has a dedicated /32 route pointing directly to the TUN interface
 ```
 Kernel sees packet destined for 100.64.0.5
     ↓
-Routing table: "100.64.0.5/32 → tailscale0"
+Routing table: "100.64.0.5/32 -> tailscale0"
     ↓
 Packet goes directly to TUN interface
     ↓
@@ -780,14 +726,14 @@ Coordination server orchestrates simultaneous packet sending:
 
 ```
 Time T=0:
-Coordination → Device A: "Send to 198.23.45.123:41641 NOW"
-Coordination → Device B: "Send to 203.45.67.89:41254 NOW"
+Coordination -> Device A: "Send to 198.23.45.123:41641 NOW"
+Coordination -> Device B: "Send to 203.45.67.89:41254 NOW"
 
 Time T=0.001:
-Device A: Sends WireGuard handshake → 198.23.45.123:41641
+Device A: Sends WireGuard handshake -> 198.23.45.123:41641
   Router A creates mapping: 192.168.1.10:41254 ↔ 203.45.67.89:41254
   
-Device B: Sends WireGuard handshake → 203.45.67.89:41254
+Device B: Sends WireGuard handshake -> 203.45.67.89:41254
   Router B creates mapping: 10.0.0.8:41641 ↔ 198.23.45.123:41641
 
 Time T=0.05:
@@ -796,7 +742,7 @@ Device B receives Device A's packet (Router B forwards it)
 
 Time T=0.1:
 WireGuard handshake completes
-Direct peer-to-peer connection established! ✓
+Direct peer-to-peer connection established! OK
 ```
 
 ---
@@ -841,17 +787,17 @@ ping 100.64.0.12
 If connection fails (e.g., symmetric NAT on both sides):
 
 ```
-Device A → DERP Server (derp1.tailscale.com):
+Device A -> DERP Server (derp1.tailscale.com):
 Establishes WebSocket: wss://derp1.tailscale.com:443
 "I'm Device A (public key abc123...), ready to receive"
 
-Device B → Same DERP Server:
+Device B -> Same DERP Server:
 Establishes WebSocket: wss://derp1.tailscale.com:443
 "I'm Device B (public key def456...), ready to receive"
 
 DERP Server connection table:
-abc123... (Device A) → WebSocket connection #1
-def456... (Device B) → WebSocket connection #2
+abc123... (Device A) -> WebSocket connection #1
+def456... (Device B) -> WebSocket connection #2
 
 Device A sends ping to 100.64.0.12:
 1. Tailscale encrypts with WireGuard (destination public key: def456...)
@@ -865,7 +811,7 @@ Device A sends ping to 100.64.0.12:
    Decrypts with WireGuard
    Delivers to kernel via TUN
 
-Ping succeeds via relay! ✓
+Ping succeeds via relay! OK
 (With ~20-50ms additional latency depending on DERP location)
 
 Background: Tailscale continues attempting direct connection
@@ -889,7 +835,7 @@ To prevent NAT timeouts, WireGuard sends periodic keepalive packets (every 25 se
 
 ### **Connection Migration**
 
-If your network changes (Wi-Fi → cellular, different Wi-Fi network):
+If your network changes (Wi-Fi -> cellular, different Wi-Fi network):
 - Tailscale detects new local IP
 - Re-runs STUN to discover new public endpoint
 - Updates coordination server
@@ -919,5 +865,5 @@ Tailscale includes DNS service:
 | **Performance overhead** | WireGuard with minimal latency |
 | **Cross-platform** | Portable codebase |
 
-Tailscale orchestrates a sophisticated dance of NAT traversal techniques, cryptographic authentication, and intelligent fallbacks to create the illusion of a simple, flat network—even when devices are scattered across restrictive networks worldwide.
+Tailscale orchestrates a sophisticated dance of NAT traversal techniques, cryptographic authentication, and intelligent fallbacks to create the illusion of a simple, flat network--even when devices are scattered across restrictive networks worldwide.
 

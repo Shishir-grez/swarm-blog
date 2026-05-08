@@ -2,7 +2,7 @@
 
 I've always wanted to have my own personal cloud. Not renting VMs from AWS or GCP, but something built from machines I actually own. When I realized my friends and I all have powerful PCs sitting around, the idea clicked: why not pool our resources?
 
-My first thought was to use **Docker Desktop's Swarm mode** after all, my friends have Docker Desktop installed, and Swarm is built right in. But as soon as I tried it, I hit a wall. Firewalls, NAT, public IPs, and the internal plumbing of Docker Desktop all seem to conspire against you. In this post, we’re going to tear down those walls, understand *why* they exist, and build a seamless, encrypted multi-node cluster using **Tailscale** and **WSL2**.
+My first thought was to use **Docker Desktop's Swarm mode** after all, my friends have Docker Desktop installed, and Swarm is built right in. But as soon as I tried it, I hit a wall. Firewalls, NAT, public IPs, and the internal plumbing of Docker Desktop all seem to conspire against you. In this post, we're going to tear down those walls, understand *why* they exist, and build a seamless, encrypted multi-node cluster using **Tailscale** and **WSL2**.
 
 ---
 
@@ -95,7 +95,7 @@ This capability depends entirely on your environment. We can verify routability 
 
 To grasp the concept of routability and valid network paths, we need to understand how data packets travel from source to destination.
 
-When communicating with devices over the internet, data packets traverse multiple network nodes—jumping between intermediate routers and gateway devices along the way. Each of these intermediate points is called a "hop."
+When communicating with devices over the internet, data packets traverse multiple network nodes--jumping between intermediate routers and gateway devices along the way. Each of these intermediate points is called a "hop."
 
 ```mermaid
 graph LR
@@ -175,13 +175,13 @@ graph TB
     style L1 fill:#e1ffe1
 ```
 
-We'll cover all 7 layers — briefly for the upper three (5–7), and in depth for the lower four (1–4), since those are the ones directly involved in how data packets travel across networks.
+We'll cover all 7 layers -- briefly for the upper three (5–7), and in depth for the lower four (1–4), since those are the ones directly involved in how data packets travel across networks.
 
 ---
 
 #### Upper Layers (5-7): Brief Overview
 
-Layers 5–7 handle what happens above the network — sessions, data formatting, and application protocols:
+Layers 5–7 handle what happens above the network -- sessions, data formatting, and application protocols:
 
 ##### Layer 7: Application Layer
 **What it handles:** User-facing network services and protocols
@@ -230,7 +230,7 @@ A set of rules that govern how data should be transmitted and received during co
 - **UDP (User Datagram Protocol):** Fast, connectionless communication without guaranteed delivery, optimized for speed
 
 ##### Port
-A logical endpoint that identifies a specific service or application on a device. Think of it as an apartment number in a building—the IP address gets you to the building, but the port number directs you to the specific apartment (application).
+A logical endpoint that identifies a specific service or application on a device. Think of it as an apartment number in a building--the IP address gets you to the building, but the port number directs you to the specific apartment (application).
 
 **Common port examples:**
 - Port 80: HTTP (web traffic)
@@ -251,7 +251,7 @@ A logical endpoint that identifies a specific service or application on a device
 │                  (Your actual payload)                          │
 └─────────────────────────────────────────────────────────────────┘
 
-Example: Your browser (port 54321) → Web server (port 443)
+Example: Your browser (port 54321) -> Web server (port 443)
 Protocol: TCP for reliable delivery
 ```
 
@@ -264,7 +264,7 @@ A **communication endpoint**, also called a **socket**, is uniquely identified b
 
 **What it handles:** Logical Addressing (IP Addresses)
 
-This layer deals with **source and destination IP addresses**—the logical addresses that identify devices on a network.
+This layer deals with **source and destination IP addresses**--the logical addresses that identify devices on a network.
 
 **Key concept:** Layer 3 is **logical**, not physical. It knows where you want to reach (the destination IP), but it doesn't necessarily know every physical step needed to get there. Instead, it relies on **routing tables** to determine which network interface to use to move the packet closer to its destination.
 
@@ -291,7 +291,7 @@ Routers at this layer examine the destination IP address and consult their routi
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 
-Example: Your device (192.168.1.10) → Google DNS (8.8.8.8)
+Example: Your device (192.168.1.10) -> Google DNS (8.8.8.8)
 TTL: Decrements at each router hop
 ```
 
@@ -301,9 +301,9 @@ TTL: Decrements at each router hop
 
 **What it handles:** Physical delivery between directly connected devices
 
-This layer manages the **physical delivery of data between two devices that are directly connected** to each other—such as your PC and your router, or your router and your ISP's gateway.
+This layer manages the **physical delivery of data between two devices that are directly connected** to each other--such as your PC and your router, or your router and your ISP's gateway.
 
-**Key concept:** Layer 2 uses **MAC (Media Access Control) addresses**—unique hardware identifiers burned into network interface cards. These addresses change at each hop as the packet moves from one directly connected device to the next.
+**Key concept:** Layer 2 uses **MAC (Media Access Control) addresses**--unique hardware identifiers burned into network interface cards. These addresses change at each hop as the packet moves from one directly connected device to the next.
 
 ##### What gets added to the packet:
 
@@ -328,7 +328,7 @@ This layer manages the **physical delivery of data between two devices that are 
 │  0x7A3F9B2C                                                     │
 └─────────────────────────────────────────────────────────────────┘
 
-Example: Your PC's NIC → Your Router's interface
+Example: Your PC's NIC -> Your Router's interface
 MAC addresses change at EVERY hop (rewritten by each router)
 ```
 
@@ -344,7 +344,7 @@ This is the physical infrastructure that actually moves data. It converts digita
 - **Light pulses** over fiber optic cables
 - **Radio waves** over wireless connections (Wi-Fi, cellular)
 
-**Key concept:** Layer 1 knows nothing about IP addresses, MAC addresses, or ports. It simply transmits raw bits (0s and 1s) from one end of a physical medium to the other. It's pure physics—voltage changes, light intensity, radio frequency modulation.
+**Key concept:** Layer 1 knows nothing about IP addresses, MAC addresses, or ports. It simply transmits raw bits (0s and 1s) from one end of a physical medium to the other. It's pure physics--voltage changes, light intensity, radio frequency modulation.
 
 ---
 
@@ -361,7 +361,7 @@ At each hop along the route, Layers 2 and 1 are "unwrapped" and "rewrapped" with
 
 ### Understanding Routing Tables and Packet Paths
 
-Now that we understand the OSI layers, let's explore how packets actually find their way from source to destination. To do this, we need to understand routing tables—the decision-making "maps" that devices use to determine where to send packets next.
+Now that we understand the OSI layers, let's explore how packets actually find their way from source to destination. To do this, we need to understand routing tables--the decision-making "maps" that devices use to determine where to send packets next.
 
 #### What is a Routing Table?
 
@@ -421,7 +421,7 @@ An IPv4 address is 32 bits long. The number after the slash tells you how many o
 
 The most important entry in your routing table is the default gateway (also called the "default route," often shown as 0.0.0.0/0 or default).
 
-**What it does**: If your device doesn't have a specific route for a destination IP, it sends the packet to the default gateway—typically your router. The router then decides the next hop.
+**What it does**: If your device doesn't have a specific route for a destination IP, it sends the packet to the default gateway--typically your router. The router then decides the next hop.
 
 **Analogy**: It's like saying, "I don't know how to get to this address, so I'll give it to someone who knows more about the outside world."
 
@@ -445,20 +445,20 @@ Your PC uses a bitwise **AND** operation to compare your network with the destin
 1.  **(Your IP) AND (Subnet Mask)** = Your Network Address
 2.  **(Destination IP) AND (Subnet Mask)** = Destination Network Address
 3.  **Compare:**
-    *   If they match → **Local** (send directly)
-    *   If they differ → **Remote** (send to Gateway)
+    *   If they match -> **Local** (send directly)
+    *   If they differ -> **Remote** (send to Gateway)
 
 **Example:**
 *   **Your IP:** `192.168.1.10` (Mask: `255.255.255.0`)
 *   **Destination A:** `192.168.1.50`
     *   Your Network: `192.168.1.0`
     *   Destination Network: `192.168.1.0`
-    *   **Match!** → Send directly (Local).
+    *   **Match!** -> Send directly (Local).
 
 *   **Destination B:** `192.168.2.50`
     *   Your Network: `192.168.1.0`
     *   Destination Network: `192.168.2.0`
-    *   **Mismatch!** → Send to Gateway (Remote).
+    *   **Mismatch!** -> Send to Gateway (Remote).
 
 </details>
 
@@ -512,7 +512,7 @@ This pattern continues at every hop until reaching the destination.
 
 <a name="important-note-about-nat"></a>
 **Important Note About NAT:**
-This example shows "pure" routing where Layer 3 addresses remain constant throughout the journey. However, in reality, if NAT is performed anywhere along the route—whether at your home router, ISP router, or any intermediate device—the IP addresses and ports will be modified at that point. For now, we're explaining the ideal scenario to help you understand hop-by-hop routing. We'll cover NAT and how it modifies Layer 3 headers in detail later.
+This example shows "pure" routing where Layer 3 addresses remain constant throughout the journey. However, in reality, if NAT is performed anywhere along the route--whether at your home router, ISP router, or any intermediate device--the IP addresses and ports will be modified at that point. For now, we're explaining the ideal scenario to help you understand hop-by-hop routing. We'll cover NAT and how it modifies Layer 3 headers in detail later.
 
 #### Visualizing the Path with tracert
 
@@ -559,7 +559,7 @@ Now that we understand how routing works, let's explore the solutions for our th
 - **Case 2: Devices with Public IPs** (Internet delivery using multiple hops)
 - **Case 3: Devices behind private IPs** (due to NAT by router, ISP, or both) [ Our Case ]
 
-Cases 1 and 2 are straightforward—we've already covered how local delivery works through direct communication and how remote delivery uses routing tables and multiple hops.
+Cases 1 and 2 are straightforward--we've already covered how local delivery works through direct communication and how remote delivery uses routing tables and multiple hops.
 
 But Case 3 presents a unique challenge. Let's explore why.
 
@@ -584,7 +584,7 @@ Your computer's internal address (`192.168.1.10`) and your public address (`203.
 
 In the early days of the internet, designers created IPv4, which provides approximately 4.3 billion unique addresses ($2^{32}$). That seemed like plenty at the time.
 
-*   **The Problem:** With billions of devices now connected to the internet—smartphones, laptops, IoT devices, servers, smart TVs—we've essentially run out of IPv4 addresses.
+*   **The Problem:** With billions of devices now connected to the internet--smartphones, laptops, IoT devices, servers, smart TVs--we've essentially run out of IPv4 addresses.
 *   **The Solution:** Instead of giving every device its own public IP address, we use private IP addresses internally and share a single public IP address among multiple devices using NAT.
 
 **How NAT Works: Sharing One Public IP**
@@ -621,7 +621,7 @@ Tailscale solves this by creating a virtual overlay network. It assigns a new, u
 
 By providing a persistent, routable IP for every device regardless of its location, Tailscale effectively checks off our first major requirement for a stable peer-to-peer mesh.
 
-** Link to Tailscale wala blog **
+This is the part where Tailscale enters the story. I have a [separate deep dive](./blog_1.md) on how Tailscale gets through NAT using STUN, UDP hole punching, WireGuard, and DERP relays. For this Swarm guide, the key takeaway is simple: Tailscale gives every machine a stable `100.x.y.z` address that is routable inside the tailnet.
 
 ### Docker Swarm Networking: Ports, Protocols & Communication Patterns
 
@@ -633,7 +633,7 @@ Docker Swarm relies on several distinct communication channels, each serving a s
 
 #### 1. Cluster Management & Control Plane
 
-##### TCP 2377 — Swarm Manager Communication
+##### TCP 2377 -- Swarm Manager Communication
 
 This port handles all control-plane traffic between manager nodes and workers. When a worker joins the swarm, it establishes a persistent TLS-encrypted TCP connection to a manager over port 2377. This channel carries:
 
@@ -645,13 +645,13 @@ Only manager nodes listen on this port. Workers initiate connections to managers
 
 ---
 
-#### 2. Gossip Protocol — Cluster State Propagation
+#### 2. Gossip Protocol -- Cluster State Propagation
 
-##### UDP 7946 — Node Discovery & Membership (gossip)
+##### UDP 7946 -- Node Discovery & Membership (gossip)
 
-Docker Swarm uses a **gossip protocol** (based on SWIM — Scalable Weakly-consistent Infection-style Membership) over UDP 7946 to propagate cluster membership information across all nodes — both managers and workers.
+Docker Swarm uses a **gossip protocol** (based on SWIM -- Scalable Weakly-consistent Infection-style Membership) over UDP 7946 to propagate cluster membership information across all nodes -- both managers and workers.
 
-**What gossip solves:** In a large cluster, broadcasting state changes to every node from a central source is expensive and fragile. Instead, each node periodically shares what it knows with a few random peers. Over several rounds, information spreads to the entire cluster — similar to how rumors spread through a crowd.
+**What gossip solves:** In a large cluster, broadcasting state changes to every node from a central source is expensive and fragile. Instead, each node periodically shares what it knows with a few random peers. Over several rounds, information spreads to the entire cluster -- similar to how rumors spread through a crowd.
 
 **What travels over this channel:**
 - Node join/leave events
@@ -660,23 +660,23 @@ Docker Swarm uses a **gossip protocol** (based on SWIM — Scalable Weakly-consi
 
 **TCP 7946** is also used on this port for gossip state synchronization when a node needs a full state transfer (e.g., after rejoining after a network partition).
 
-> **Why UDP?** Gossip tolerates message loss — if one message is dropped, the same information will arrive via a different peer shortly after. This makes UDP a natural fit.
+> **Why UDP?** Gossip tolerates message loss -- if one message is dropped, the same information will arrive via a different peer shortly after. This makes UDP a natural fit.
 
 ---
 
-#### 3. Raft Consensus — Manager Coordination
+#### 3. Raft Consensus -- Manager Coordination
 
 ##### Internal Raft Communication (over TCP 2377)
 
-Manager nodes must agree on the cluster's authoritative state — which services exist, how many replicas they have, and which nodes are healthy. Docker Swarm uses the **Raft consensus algorithm** for this.
+Manager nodes must agree on the cluster's authoritative state -- which services exist, how many replicas they have, and which nodes are healthy. Docker Swarm uses the **Raft consensus algorithm** for this.
 
 **How Raft works in brief:**
 
 - One manager is elected **leader**. All writes (service updates, scaling events) go through the leader.
-- The leader replicates log entries to a quorum of managers before committing them. A quorum is `(N/2) + 1` managers — so a 3-manager swarm tolerates 1 failure, a 5-manager swarm tolerates 2.
+- The leader replicates log entries to a quorum of managers before committing them. A quorum is `(N/2) + 1` managers -- so a 3-manager swarm tolerates 1 failure, a 5-manager swarm tolerates 2.
 - If the leader becomes unreachable, remaining managers hold an election and a new leader is chosen.
 
-**What Raft protects against:** Split-brain scenarios — where two parts of a partitioned cluster both believe they're authoritative and make conflicting decisions.
+**What Raft protects against:** Split-brain scenarios -- where two parts of a partitioned cluster both believe they're authoritative and make conflicting decisions.
 
 Raft traffic runs over the same TCP 2377 channel, not a separate port, but it's worth understanding as a distinct logical layer.
 
@@ -686,11 +686,11 @@ Raft traffic runs over the same TCP 2377 channel, not a separate port, but it's 
 
 #### 4. Container-to-Container Communication
 
-##### UDP 4789 — VXLAN Overlay Network
+##### UDP 4789 -- VXLAN Overlay Network
 
 When containers on different physical hosts need to talk to each other, Docker uses **VXLAN (Virtual Extensible LAN)** encapsulation over UDP port 4789.
 
-**What VXLAN does:** It wraps a container's Ethernet frame inside a UDP packet, allowing it to travel across the underlying physical network. On the receiving host, the VXLAN driver unwraps the packet and delivers it to the target container as if they were on the same local network — even though they're on different machines.
+**What VXLAN does:** It wraps a container's Ethernet frame inside a UDP packet, allowing it to travel across the underlying physical network. On the receiving host, the VXLAN driver unwraps the packet and delivers it to the target container as if they were on the same local network -- even though they're on different machines.
 
 **The result:** Containers across hosts communicate using their overlay IP addresses (e.g., `10.0.0.x`) without needing to know anything about the physical network topology underneath.
 
@@ -704,7 +704,7 @@ When containers on different physical hosts need to talk to each other, Docker u
 
 ##### TCP/UDP 2377 + Published Service Ports
 
-Docker Swarm's **routing mesh** allows any node in the cluster to accept traffic for a published service port — even if no container for that service is running on that node. The node receiving the traffic forwards it to a node that does have a healthy replica.
+Docker Swarm's **routing mesh** allows any node in the cluster to accept traffic for a published service port -- even if no container for that service is running on that node. The node receiving the traffic forwards it to a node that does have a healthy replica.
 
 This is implemented using:
 - **iptables rules** to intercept incoming traffic on published ports
@@ -720,9 +720,9 @@ This is implemented using:
 | Port | Protocol | Purpose |
 |------|----------|---------|
 | 2377 | TCP | Manager control plane, Raft consensus |
-| 7946 | UDP | Gossip — node discovery, membership, overlay endpoint info |
-| 7946 | TCP | Gossip — full state sync after partition recovery |
-| 4789 | UDP | VXLAN overlay — container-to-container traffic across hosts |
+| 7946 | UDP | Gossip -- node discovery, membership, overlay endpoint info |
+| 7946 | TCP | Gossip -- full state sync after partition recovery |
+| 4789 | UDP | VXLAN overlay -- container-to-container traffic across hosts |
 | Published ports | TCP/UDP | Ingress routing mesh for external service access |
 
 ---
@@ -744,13 +744,13 @@ This is implemented using:
 <details>
 <summary><b>Patterns Worth Calling Out (Important for Firewalls)</b></summary>
 
-**Raft heartbeats are unsolicited from the follower's perspective.** The leader sends heartbeats on its own schedule — followers don't ask for them. If a follower stops receiving heartbeats within an election timeout window (150–300ms by default in most Raft implementations), it assumes the leader is dead and triggers an election. This means your firewall needs to allow unsolicited inbound TCP on 2377 to manager nodes from other managers — not just from workers.
+**Raft heartbeats are unsolicited from the follower's perspective.** The leader sends heartbeats on its own schedule -- followers don't ask for them. If a follower stops receiving heartbeats within an election timeout window (150–300ms by default in most Raft implementations), it assumes the leader is dead and triggers an election. This means your firewall needs to allow unsolicited inbound TCP on 2377 to manager nodes from other managers -- not just from workers.
 
-**Gossip is symmetric but unpredictable in direction.** Any node can push to any other node at any time. You can't model gossip as "node A talks to node B" — the initiator rotates randomly by design. This means UDP 7946 must be open in both directions between all nodes, not just between managers and workers.
+**Gossip is symmetric but unpredictable in direction.** Any node can push to any other node at any time. You can't model gossip as "node A talks to node B" -- the initiator rotates randomly by design. This means UDP 7946 must be open in both directions between all nodes, not just between managers and workers.
 
 **VXLAN appears bidirectional at the network layer but is encapsulated.** Your physical firewall sees UDP packets on port 4789 flowing in both directions between hosts. Inside each packet is a full Ethernet frame. Stateful firewalls that only track UDP flows may handle this correctly, but stateless ACLs need explicit rules for both directions.
 
-**Routing mesh ingress is the only channel that accepts traffic from outside the cluster.** All other channels are internal node-to-node communication. This is an important security boundary — you should restrict ports 2377, 7946, and 4789 to traffic originating from known swarm node IPs only, and expose only your published service ports to external networks.
+**Routing mesh ingress is the only channel that accepts traffic from outside the cluster.** All other channels are internal node-to-node communication. This is an important security boundary -- you should restrict ports 2377, 7946, and 4789 to traffic originating from known swarm node IPs only, and expose only your published service ports to external networks.
 
 </details>
 
@@ -830,7 +830,7 @@ Container-2 Network Namespace:
 - Network isolation: Container-1 cannot see Container-2's interfaces
 - Independent firewall rules (iptables) per namespace
 
-**Critical insight:** This is why Container-1 and Container-2 on the **same host** cannot communicate directly by default—they exist in completely separate network namespaces.
+**Critical insight:** This is why Container-1 and Container-2 on the **same host** cannot communicate directly by default--they exist in completely separate network namespaces.
 
 ---
 
@@ -994,7 +994,7 @@ Machine-A
 └───────────────────────────────────────┘
 ```
 
-**Problem:** Container-1 cannot ping `172.17.0.3` because it doesn't even know that interface exists—it's in a separate network namespace.
+**Problem:** Container-1 cannot ping `172.17.0.3` because it doesn't even know that interface exists--it's in a separate network namespace.
 
 ---
 
@@ -1030,7 +1030,7 @@ The problem compounds when containers are on **different machines**:
 
 An **overlay network** is a virtual network topology built **on top of** an existing physical network infrastructure (the underlay). It abstracts away the underlying physical network, creating a logical network that spans multiple physical hosts.
 
-**Analogy:** Imagine a postal system. The **underlay** is the physical road network—highways, streets, addresses. The **overlay** is the logical addressing system—ZIP codes, routing rules that postal workers follow. A letter traveling from New York to California uses the overlay addressing (ZIP codes) but physically travels on the underlay (roads).
+**Analogy:** Imagine a postal system. The **underlay** is the physical road network--highways, streets, addresses. The **overlay** is the logical addressing system--ZIP codes, routing rules that postal workers follow. A letter traveling from New York to California uses the overlay addressing (ZIP codes) but physically travels on the underlay (roads).
 
 **In container networking:**
 - **Underlay:** Physical network (Ethernet, routers, host IPs like `192.168.1.10`, `192.168.1.20`)
@@ -1094,9 +1094,9 @@ docker swarm init --advertise-addr 192.168.1.10
 
 ## The `docker_gwbridge` Network
 
-When Docker Swarm initializes, it creates two bridge networks on the host — not one. The `ingress` overlay gets most of the attention, but `docker_gwbridge` is equally important and serves a distinct purpose.
+When Docker Swarm initializes, it creates two bridge networks on the host -- not one. The `ingress` overlay gets most of the attention, but `docker_gwbridge` is equally important and serves a distinct purpose.
 
-`docker_gwbridge` is a local Linux bridge network that connects containers participating in overlay networks back to the host's external network stack. While the overlay network handles east-west traffic (container-to-container across hosts), `docker_gwbridge` handles north-south traffic — specifically, it gives containers a path to reach destinations outside the overlay, including the internet.
+`docker_gwbridge` is a local Linux bridge network that connects containers participating in overlay networks back to the host's external network stack. While the overlay network handles east-west traffic (container-to-container across hosts), `docker_gwbridge` handles north-south traffic -- specifically, it gives containers a path to reach destinations outside the overlay, including the internet.
 
 ```text
 Host Network (worker-1):
@@ -1117,7 +1117,7 @@ Host Network (worker-1):
 └─────────────────────────────────────────────────────────────┘
 ```
 
-Every container attached to an overlay network gets two interfaces: one on the overlay for service-to-service communication, and one on `docker_gwbridge` for everything else. Traffic is routed based on destination — overlay IPs go through the VXLAN tunnel, everything else exits through `docker_gwbridge` via NAT.
+Every container attached to an overlay network gets two interfaces: one on the overlay for service-to-service communication, and one on `docker_gwbridge` for everything else. Traffic is routed based on destination -- overlay IPs go through the VXLAN tunnel, everything else exits through `docker_gwbridge` via NAT.
 
 ```bash
 # Inspect docker_gwbridge on any swarm node
@@ -1133,7 +1133,7 @@ docker network inspect docker_gwbridge
 }
 ```
 
-**Why this matters for troubleshooting:** If a container can reach other containers on the overlay but cannot reach the internet or external services, the problem is almost always in the `docker_gwbridge` path — either a NAT rule is missing, the bridge is misconfigured, or the host's IP forwarding is disabled (`net.ipv4.ip_forward = 0`).
+**Why this matters for troubleshooting:** If a container can reach other containers on the overlay but cannot reach the internet or external services, the problem is almost always in the `docker_gwbridge` path -- either a NAT rule is missing, the bridge is misconfigured, or the host's IP forwarding is disabled (`net.ipv4.ip_forward = 0`).
 
 ---
 
@@ -1172,9 +1172,9 @@ When a container joins an overlay network:
 Service: web-app (3 replicas on overlay "frontend")
 
 Manager assigns IPs:
-├── web-app.1 (worker-1) → 10.0.1.5
-├── web-app.2 (worker-2) → 10.0.1.7
-└── web-app.3 (worker-3) → 10.0.1.9
+├── web-app.1 (worker-1) -> 10.0.1.5
+├── web-app.2 (worker-2) -> 10.0.1.7
+└── web-app.3 (worker-3) -> 10.0.1.9
 
 Manager distributes mapping via gossip:
 ├── "10.0.1.5 is on worker-1 (192.168.1.10)"
@@ -1243,13 +1243,13 @@ T=0: Container web-app.1 starts on worker-1
      Gets IP: 10.0.1.5
 
 T=1: worker-1 gossips to worker-2:
-     "10.0.1.5 → 192.168.1.10 (MAC: aa:bb:cc:dd:ee:ff)"
+     "10.0.1.5 -> 192.168.1.10 (MAC: aa:bb:cc:dd:ee:ff)"
 
 T=2: worker-2 gossips to worker-3:
-     "10.0.1.5 → 192.168.1.10 (MAC: aa:bb:cc:dd:ee:ff)"
+     "10.0.1.5 -> 192.168.1.10 (MAC: aa:bb:cc:dd:ee:ff)"
 
 T=3: worker-3 gossips to worker-4:
-     "10.0.1.5 → 192.168.1.10 (MAC: aa:bb:cc:dd:ee:ff)"
+     "10.0.1.5 -> 192.168.1.10 (MAC: aa:bb:cc:dd:ee:ff)"
 
 T=4: All nodes know the mapping
      Any node can now route traffic to 10.0.1.5
@@ -1281,7 +1281,7 @@ Now we understand the **what** (overlay networks) and **why** (cross-host contai
 
 ---
 
-## VNI Assignment — Who Picks the Number?
+## VNI Assignment -- Who Picks the Number?
 
 The packet journey examples use VNI `4097` without explanation. VNIs don't need to be memorized, but understanding how they're assigned prevents confusion when you inspect VXLAN interfaces and see unexpected values.
 
@@ -1289,11 +1289,11 @@ Docker assigns VNIs automatically when overlay networks are created. The assignm
 
 ```text
 Network created:       VNI assigned:
-ingress (built-in)  →  256
-docker_gwbridge     →  (local bridge, no VNI — not a VXLAN network)
-First user overlay  →  4096
-Second user overlay →  4097
-Third user overlay  →  4098
+ingress (built-in)  ->  256
+docker_gwbridge     ->  (local bridge, no VNI -- not a VXLAN network)
+First user overlay  ->  4096
+Second user overlay ->  4097
+Third user overlay  ->  4098
 ...and so on
 ```
 
@@ -1314,13 +1314,13 @@ ip -d link show type vxlan
     vxlan id 4097 local 192.168.1.10 dev eth0 port 4789
 ```
 
-**Why VNI matters for isolation:** Containers on different overlay networks may be on the same physical hosts, but their VXLAN traffic is tagged with different VNIs. A VTEP receiving a VXLAN packet checks the VNI before decapsulating — if the VNI doesn't match any local overlay network, the packet is discarded. This is what enforces network isolation between, say, a `frontend` overlay and a `database` overlay even though both traverse the same UDP 4789 channel on the same physical links.
+**Why VNI matters for isolation:** Containers on different overlay networks may be on the same physical hosts, but their VXLAN traffic is tagged with different VNIs. A VTEP receiving a VXLAN packet checks the VNI before decapsulating -- if the VNI doesn't match any local overlay network, the packet is discarded. This is what enforces network isolation between, say, a `frontend` overlay and a `database` overlay even though both traverse the same UDP 4789 channel on the same physical links.
 
 ```text
 Packet arrives at worker-2 on UDP 4789:
-  VNI: 4096  →  Belongs to "frontend" overlay  →  Decapsulate and deliver
-  VNI: 4097  →  Belongs to "backend" overlay   →  Decapsulate and deliver
-  VNI: 9999  →  Unknown overlay                →  Discard
+  VNI: 4096  ->  Belongs to "frontend" overlay  ->  Decapsulate and deliver
+  VNI: 4097  ->  Belongs to "backend" overlay   ->  Decapsulate and deliver
+  VNI: 9999  ->  Unknown overlay                ->  Discard
 ```
 
 ---
@@ -1430,7 +1430,7 @@ vxlan id 4097                    ← VNI for this overlay
 
 ---
 
-## Why `nolearning` — And What Dynamic Learning Would Break
+## Why `nolearning` -- And What Dynamic Learning Would Break
 
 The VXLAN interface configuration includes a flag that deserves more than a comment:
 
@@ -1447,14 +1447,14 @@ vxlan id 4096
 
 **What dynamic MAC learning is:** In a normal Linux bridge or switch, when a frame arrives from an unknown source MAC, the bridge records which port that MAC came from. Future frames destined for that MAC get forwarded directly to that port instead of being flooded everywhere. This is how bridges build their forwarding tables automatically without any central configuration.
 
-**Why Docker disables it for VXLAN:** Dynamic learning works by observing traffic. In a VXLAN context, this means the VTEP would learn remote container MACs by watching encapsulated packets arrive from remote hosts. This sounds reasonable — but it creates two serious problems:
+**Why Docker disables it for VXLAN:** Dynamic learning works by observing traffic. In a VXLAN context, this means the VTEP would learn remote container MACs by watching encapsulated packets arrive from remote hosts. This sounds reasonable -- but it creates two serious problems:
 
 ```text
 Problem 1: Timing
   A container starts on worker-2.
   worker-1 hasn't received gossip about it yet.
   worker-1 tries to send a packet to the container's MAC.
-  No FDB entry exists → packet is flooded to all VTEPs.
+  No FDB entry exists -> packet is flooded to all VTEPs.
   Dynamic learning only kicks in after the first packet arrives.
   The first packet is effectively lost or flooded.
 
@@ -1465,7 +1465,7 @@ Problem 2: Stale entries
   Default aging time: 300 seconds (5 minutes of broken routing).
 ```
 
-With `nolearning` enabled, Docker is the sole authority on FDB entries. Gossip distributes MAC-to-VTEP mappings proactively when containers start, move, or stop — so every VTEP has the correct entry before the first packet is ever sent. There are no race conditions and no stale entries from aged-out dynamic learning.
+With `nolearning` enabled, Docker is the sole authority on FDB entries. Gossip distributes MAC-to-VTEP mappings proactively when containers start, move, or stop -- so every VTEP has the correct entry before the first packet is ever sent. There are no race conditions and no stale entries from aged-out dynamic learning.
 
 ```text
 With nolearning + gossip:
@@ -1487,7 +1487,7 @@ No flooding, no race condition, no stale entries
 ### **FDB (Forwarding Database): The MAC-to-VTEP Mapping Table**
 
 The **FDB (Forwarding Database)** is a kernel-maintained table that maps:
-- **Container MAC addresses** → **Remote VTEP IP addresses**
+- **Container MAC addresses** -> **Remote VTEP IP addresses**
 
 This tells the local VTEP where to send encapsulated packets.
 
@@ -1523,7 +1523,7 @@ Container-1 (on worker-1) wants to send packet to Container-2 (on worker-2)
    Dest IP: 10.0.1.7
 
 2. VTEP on worker-1 looks up FDB:
-   MAC 02:42:0a:00:01:07 → Remote VTEP: 192.168.1.20
+   MAC 02:42:0a:00:01:07 -> Remote VTEP: 192.168.1.20
 
 3. VTEP encapsulates packet:
    Outer Dest IP: 192.168.1.20 (worker-2)
@@ -1564,7 +1564,7 @@ Result: All nodes can route to the new container
 
 ### **ARP Proxy at VTEP**
 
-**Problem:** Containers need to resolve IP addresses to MAC addresses using ARP. But in an overlay network, containers on remote hosts aren't on the same physical network segment—traditional ARP broadcasts won't reach them.
+**Problem:** Containers need to resolve IP addresses to MAC addresses using ARP. But in an overlay network, containers on remote hosts aren't on the same physical network segment--traditional ARP broadcasts won't reach them.
 
 **Solution:** The VTEP acts as an **ARP proxy**, responding to ARP requests on behalf of remote containers.
 
@@ -1581,7 +1581,7 @@ Packet arrives at br-overlay -> VTEP intercepts.
 
 [Step 3: VTEP Lookup]
 # ip neighbor show dev vx-000001-a2b3c
-Found: 10.0.1.7 → MAC 02:42:0a:00:01:07
+Found: 10.0.1.7 -> MAC 02:42:0a:00:01:07
 
 [Step 4: ARP Reply (Proxy)]
 VTEP: "10.0.1.7 is at 02:42:0a:00:01:07"
@@ -1612,7 +1612,7 @@ In a traditional Ethernet network, this broadcast reaches every device on the se
 
 **In a VXLAN overlay, this breaks entirely.**
 
-Container-2 (which owns `10.0.1.7`) is on a completely different host. The overlay bridge on worker-1 receives the ARP broadcast, but it has no way to forward it to Container-2 — ARP broadcasts are not routed across Layer 3 boundaries, and the underlay network between worker-1 and worker-2 is a Layer 3 IP network.
+Container-2 (which owns `10.0.1.7`) is on a completely different host. The overlay bridge on worker-1 receives the ARP broadcast, but it has no way to forward it to Container-2 -- ARP broadcasts are not routed across Layer 3 boundaries, and the underlay network between worker-1 and worker-2 is a Layer 3 IP network.
 
 ```text
 [Without ARP Proxy Flow]
@@ -1631,9 +1631,9 @@ ARP request is DROPPED (L3 boundary)
 [!] Communication fails silently at Layer 2
 ```
 
-This failure mode is particularly confusing to diagnose because the overlay IP is reachable in theory — the routing and VXLAN configuration might be perfect — but ARP resolution is the invisible prerequisite that stops everything before a single data packet is sent.
+This failure mode is particularly confusing to diagnose because the overlay IP is reachable in theory -- the routing and VXLAN configuration might be perfect -- but ARP resolution is the invisible prerequisite that stops everything before a single data packet is sent.
 
-The VTEP's ARP proxy solves this by intercepting the broadcast before it goes anywhere and answering it locally using the neighbor table populated by gossip — as covered in the section above.
+The VTEP's ARP proxy solves this by intercepting the broadcast before it goes anywhere and answering it locally using the neighbor table populated by gossip -- as covered in the section above.
 
 ---
 
@@ -1748,7 +1748,7 @@ Packet arrives at bridge with:
   Dest MAC: 02:42:0a:00:01:07
 
 Bridge MAC table lookup:
-  02:42:0a:00:01:07 → Not on local bridge ports
+  02:42:0a:00:01:07 -> Not on local bridge ports
   
 Bridge decision:
   Forward to VXLAN interface (vx-000001)
@@ -1846,7 +1846,7 @@ Remote Physical NIC (eth0):
 VTEP on worker-2:
 
 1. Validates VXLAN header:
-   - Check VNI: 4097 ✓ (matches local overlay)
+   - Check VNI: 4097 OK (matches local overlay)
    - Extract inner Ethernet frame
 
 2. Decapsulation:
@@ -1858,9 +1858,9 @@ VTEP on worker-2:
    
    Reveal original packet:
      ┌────────────────────────────────┐
-     │ Ethernet: 02:42:0a:00:01:05 →  │
+     │ Ethernet: 02:42:0a:00:01:05 ->  │
      │           02:42:0a:00:01:07    │
-     │ IP: 10.0.1.5 → 10.0.1.7        │
+     │ IP: 10.0.1.5 -> 10.0.1.7        │
      │ TCP: Port 80                   │
      │ Payload: HTTP GET              │
      └────────────────────────────────┘
@@ -1879,7 +1879,7 @@ Packet arrives with:
   Dest MAC: 02:42:0a:00:01:07
 
 Bridge MAC table lookup:
-  02:42:0a:00:01:07 → veth456 (Container-2)
+  02:42:0a:00:01:07 -> veth456 (Container-2)
 
 Bridge decision:
   Forward to veth456
@@ -1911,7 +1911,7 @@ Container-2's Network Stack:
          ▼
   Packet arrives at eth0
          ▼
-  IP layer: Dest IP 10.0.1.7 ✓ (matches local)
+  IP layer: Dest IP 10.0.1.7 OK (matches local)
          ▼
   TCP layer: Port 80 (listening)
          ▼
@@ -1930,10 +1930,10 @@ Container-2's Network Stack:
 The HTTP response follows the **exact reverse path**:
 
 ```text
-Container-2 → eth0 → veth pair → overlay bridge →
-VXLAN interface → VTEP encapsulation →
-Physical network (underlay) →
-VTEP decapsulation → overlay bridge → veth pair →
+Container-2 -> eth0 -> veth pair -> overlay bridge ->
+VXLAN interface -> VTEP encapsulation ->
+Physical network (underlay) ->
+VTEP decapsulation -> overlay bridge -> veth pair ->
 Container-1
 ```
 
@@ -1943,7 +1943,7 @@ Container-1
 
 ## Same-Host Container Communication
 
-The cross-host packet journey covered earlier traces the full VXLAN encapsulation path. But what happens when Container-1 and Container-2 are on the **same host**? VXLAN encapsulation is not involved at all — the overlay bridge handles delivery locally.
+The cross-host packet journey covered earlier traces the full VXLAN encapsulation path. But what happens when Container-1 and Container-2 are on the **same host**? VXLAN encapsulation is not involved at all -- the overlay bridge handles delivery locally.
 
 ### Step-by-Step: Same-Host Packet Flow
 
@@ -1969,7 +1969,7 @@ Container-1 eth0@if12
       ▼
       │ veth pair
       ▼
-Host: veth123abc  →  attached to br-overlay
+Host: veth123abc  ->  attached to br-overlay
 ```
 
 #### 3. Overlay Bridge Looks Up Destination MAC
@@ -1977,12 +1977,12 @@ Host: veth123abc  →  attached to br-overlay
 ```text
 br-overlay MAC table:
 
-02:42:0a:00:01:05 → veth123abc (Container-1)  ← local
-02:42:0a:00:01:07 → veth456def (Container-2)  ← also local
+02:42:0a:00:01:05 -> veth123abc (Container-1)  ← local
+02:42:0a:00:01:07 -> veth456def (Container-2)  ← also local
 
 Bridge decision:
   Dest MAC 02:42:0a:00:01:07 found on local port veth456def
-  Forward directly — no VXLAN needed
+  Forward directly -- no VXLAN needed
 ```
 
 #### 4. Packet Crosses into Container-2 via veth Pair
@@ -2000,19 +2000,19 @@ Container-2 eth0@if14 (10.0.1.7)
 
 ```text
 Cross-host path:
-  Container-1 → veth → bridge → VXLAN encapsulation
-  → Physical NIC → Underlay network → Remote NIC
-  → VXLAN decapsulation → bridge → veth → Container-2
+  Container-1 -> veth -> bridge -> VXLAN encapsulation
+  -> Physical NIC -> Underlay network -> Remote NIC
+  -> VXLAN decapsulation -> bridge -> veth -> Container-2
 
 Same-host path:
-  Container-1 → veth → bridge → veth → Container-2
+  Container-1 -> veth -> bridge -> veth -> Container-2
   
 VXLAN is completely bypassed.
 No encapsulation overhead.
 No UDP 4789 traffic generated.
 ```
 
-This has a direct performance implication: scheduling replicas of latency-sensitive services on the same host eliminates VXLAN overhead entirely. Docker Swarm's scheduler doesn't do this automatically — you need to use placement constraints to achieve it deliberately.
+This has a direct performance implication: scheduling replicas of latency-sensitive services on the same host eliminates VXLAN overhead entirely. Docker Swarm's scheduler doesn't do this automatically -- you need to use placement constraints to achieve it deliberately.
 
 ---
 
@@ -2146,7 +2146,7 @@ As we established earlier, containers rely on specific Linux kernel primitives:
 
 1. **Real Linux Kernel:** Microsoft ships an actual Linux kernel (maintained by Microsoft) that runs in a Hyper-V virtual machine
 2. **Hyper-V Virtualization:** Uses Windows' native hypervisor technology
-3. **Managed VM:** The Linux VM is automatically managed—starts on demand, stops when idle
+3. **Managed VM:** The Linux VM is automatically managed--starts on demand, stops when idle
 4. **Tight Integration:** Direct filesystem access between Windows and Linux, shared network stack
 
 ---
@@ -2201,12 +2201,12 @@ As we established earlier, containers rely on specific Linux kernel primitives:
 
 **How it works:**
 
-1. **Windows boots** → Hyper-V hypervisor initializes
-2. **User starts Docker Desktop** → Triggers WSL 2 VM creation
-3. **Lightweight Linux VM starts** → Boots Linux kernel in seconds
-4. **Docker Engine starts inside VM** → `dockerd` runs in the Linux environment
-5. **Containers run natively** → Full access to Linux kernel features
-6. **Docker CLI on Windows** → Communicates with Docker Engine in VM via named pipes/sockets
+1. **Windows boots** -> Hyper-V hypervisor initializes
+2. **User starts Docker Desktop** -> Triggers WSL 2 VM creation
+3. **Lightweight Linux VM starts** -> Boots Linux kernel in seconds
+4. **Docker Engine starts inside VM** -> `dockerd` runs in the Linux environment
+5. **Containers run natively** -> Full access to Linux kernel features
+6. **Docker CLI on Windows** -> Communicates with Docker Engine in VM via named pipes/sockets
 
 **Key Benefit:** Containers run with **native Linux performance** because they're executing in a real Linux kernel, not emulated.
 
@@ -2305,7 +2305,7 @@ Let's examine the key processes that spawn when Docker Desktop runs:
 
 ---
 
-##### 6. Docker Engine (dockerd) — Inside Linux VM
+##### 6. Docker Engine (dockerd) -- Inside Linux VM
 
 **Location:** Inside WSL 2 Linux VM
 
@@ -2339,7 +2339,7 @@ Windows Host
     ├─ vpnkit.exe (User Process)
     │       │
     │       ├─ Proxies network traffic
-    │       └─ Shared memory → Linux VM
+    │       └─ Shared memory -> Linux VM
     │
     ├─ Docker Dashboard (Electron App)
     │       └─ UI for Docker Desktop
@@ -2359,7 +2359,7 @@ Windows Host
         ║       ↓                           ║
         ║   /var/run/docker.sock            ║
         ║       ↓                           ║
-        ║   containerd → runc               ║
+        ║   containerd -> runc               ║
         ║       ↓                           ║
         ║   Containers (namespaces)         ║
         ╚═══════════════════════════════════╝
@@ -2468,9 +2468,9 @@ overlay on / type overlay (ro,relatime,lowerdir=/snapshot/root:...)
 ```
 
 **Key directories are read-only:**
-- `/usr` → Read-only
-- `/bin`, `/sbin` → Read-only
-- `/lib` → Read-only
+- `/usr` -> Read-only
+- `/bin`, `/sbin` -> Read-only
+- `/lib` -> Read-only
 
 **Why this design?**
 - **Reliability:** Prevents corruption; VM can be reset to known-good state
@@ -2517,7 +2517,7 @@ For the `tailscaled` daemon to run persistently it needs a service manager (syst
 - Restart it on failure
 - Handle network configuration changes
 
-> **Clarification:** WSL2 as a technology **has supported systemd since September 2022** (Windows 11 22H2). A standard WSL2 Ubuntu distro runs systemd normally — `sudo systemctl` works out of the box. The no-systemd limitation described above is specific to Docker Desktop's managed internal VM (`docker-desktop` distro), not to WSL2 in general.
+> **Clarification:** WSL2 as a technology **has supported systemd since September 2022** (Windows 11 22H2). A standard WSL2 Ubuntu distro runs systemd normally -- `sudo systemctl` works out of the box. The no-systemd limitation described above is specific to Docker Desktop's managed internal VM (`docker-desktop` distro), not to WSL2 in general.
 
 ---
 
@@ -2566,7 +2566,7 @@ Internet (203.45.67.89)
     ↓
 Router (NAT gateway)
     ↓
-    Rule: External 8080 → Internal 192.168.1.50:80
+    Rule: External 8080 -> Internal 192.168.1.50:80
     ↓
 Internal Server (192.168.1.50:80)
 ```
@@ -2602,7 +2602,7 @@ Container (10.0.1.5:80)
 docker run -p 8080:80 nginx
 
 # Windows host can access:
-# http://localhost:8080  → Container's port 80
+# http://localhost:8080  -> Container's port 80
 ```
 
 ---
@@ -2620,11 +2620,11 @@ Port forwarding is designed for **client-server, request-response** communicatio
 **Example (HTTP):**
 
 ```text
-Client (192.168.1.50) → Request → Port Forward → Server (container)
+Client (192.168.1.50) -> Request -> Port Forward -> Server (container)
 Client ← Response ← Port Forward ← Server
 
 Connection state maintained in NAT table:
-  192.168.1.50:54321 ↔ 192.168.1.100:8080 → 10.0.1.5:80
+  192.168.1.50:54321 ↔ 192.168.1.100:8080 -> 10.0.1.5:80
 ```
 
 **This works because:**
@@ -2643,10 +2643,10 @@ Docker Swarm requires **bidirectional, peer-to-peer** communication, not client-
 ```text
 Swarm Communication Ports:
 
-2377/tcp → Cluster management (Raft, gRPC)
-7946/tcp → Gossip protocol
-7946/udp → Gossip protocol
-4789/udp → VXLAN overlay network data plane
+2377/tcp -> Cluster management (Raft, gRPC)
+7946/tcp -> Gossip protocol
+7946/udp -> Gossip protocol
+4789/udp -> VXLAN overlay network data plane
 ```
 
 **Challenge:** You'd need to forward all these ports, but:
@@ -2662,10 +2662,10 @@ Swarm Communication Ports:
 
 ```text
 Standard Docker Desktop Port Forward:
-  Windows Host:8080 → Container:80
+  Windows Host:8080 -> Container:80
 
 What Swarm Needs:
-  Physical Network:2377 → Docker Engine:2377
+  Physical Network:2377 -> Docker Engine:2377
                     ↑
                     Docker Engine is in the VM, not a container!
 ```
@@ -2702,8 +2702,8 @@ worker-2 (Docker Desktop VM)
 ```
 
 **Port forwarding requires:**
-- A connection initiated **from outside** (e.g., worker-1 → Docker Desktop)
-- But Docker Desktop's NAT expects connections initiated **from inside** (container → outside)
+- A connection initiated **from outside** (e.g., worker-1 -> Docker Desktop)
+- But Docker Desktop's NAT expects connections initiated **from inside** (container -> outside)
 
 **Mismatch:** Swarm's peer-to-peer communication doesn't fit port forwarding's request-response model.
 
@@ -2717,7 +2717,7 @@ Let's trace how a typical port-forwarded request works:
 
 ```text
 Step 1: User makes request
-  Windows Browser → http://localhost:8080
+  Windows Browser -> http://localhost:8080
 
 Step 2: Windows network stack
   Lookup: localhost:8080
@@ -2726,7 +2726,7 @@ Step 2: Windows network stack
 Step 3: vpnkit.exe intercepts
   Listening on 0.0.0.0:8080 (Windows side)
   Matches port forwarding rule:
-    8080 → VM container port 80
+    8080 -> VM container port 80
 
 Step 4: Shared memory channel
   vpnkit.exe writes request to shared memory buffer
@@ -2741,8 +2741,8 @@ Step 6: Container receives request
   nginx processes HTTP request
 
 Step 7: Response path (reverse)
-  Container → VM VPNKit → Shared memory →
-  vpnkit.exe → Windows network stack → Browser
+  Container -> VM VPNKit -> Shared memory ->
+  vpnkit.exe -> Windows network stack -> Browser
 ```
 
 **Key observation:** This path works for **HTTP/TCP request-response** but not for **spontaneous peer-to-peer** protocols like Swarm gossip.
@@ -2753,7 +2753,7 @@ Step 7: Response path (reverse)
 
 #### The Outbound Traffic Problem
 
-Docker Swarm doesn't just need to **receive** connections—it needs to **initiate** connections to other nodes, potentially **across the internet** or **through corporate networks**.
+Docker Swarm doesn't just need to **receive** connections--it needs to **initiate** connections to other nodes, potentially **across the internet** or **through corporate networks**.
 
 **Requirement:** Bidirectional, peer-to-peer communication where any node can:
 - Initiate a connection to any other node
@@ -2774,7 +2774,7 @@ A **proxy** is an intermediary that forwards requests on behalf of clients.
 
 ###### 1. Forward Proxy (Client-Side Proxy)
 
-Client → Proxy → Internet
+Client -> Proxy -> Internet
 
 ```text
 Corporate Network:
@@ -2796,7 +2796,7 @@ Internet
 
 ###### 2. Reverse Proxy (Server-Side Proxy)
 
-Internet → Proxy → Backend Servers
+Internet -> Proxy -> Backend Servers
 
 ```text
 Web Architecture:
@@ -2887,7 +2887,7 @@ VPNKit is a **hybrid user-space network stack proxy** with characteristics of:
 ```text
 Without VPNKit:
 
-Container → VM network → Hyper-V virtual switch → Windows → Corporate VPN?
+Container -> VM network -> Hyper-V virtual switch -> Windows -> Corporate VPN?
 
 Problem: VM traffic doesn't respect Windows VPN routes!
   - Packets from VM bypass VPN
@@ -2960,9 +2960,9 @@ Step 1: Container generates packet
     Dest:   93.184.216.34:80 (example.com)
 ```
 
-**Step 2:** Packet routed to VM network — Docker Engine forwards to VM's network stack.
+**Step 2:** Packet routed to VM network -- Docker Engine forwards to VM's network stack.
 
-**Step 3:** VPNKit client intercepts — iptables rule redirects to VPNKit process. Packet captured before leaving VM.
+**Step 3:** VPNKit client intercepts -- iptables rule redirects to VPNKit process. Packet captured before leaving VM.
 
 **Step 4:** Write to shared memory:
 
@@ -2986,7 +2986,7 @@ Step 1: Container generates packet
     - HTTP request
 ```
 
-**Step 6:** Protocol reconstruction — VPNKit **rebuilds** the request as if from Windows:
+**Step 6:** Protocol reconstruction -- VPNKit **rebuilds** the request as if from Windows:
 
 ```text
   Original packet:
@@ -3001,7 +3001,7 @@ Step 1: Container generates packet
     10.0.1.5:54321 ↔ 192.168.1.100:61234
 ```
 
-**Step 7:** Use Windows network stack — vpnkit.exe creates a **real Windows socket**:
+**Step 7:** Use Windows network stack -- vpnkit.exe creates a **real Windows socket**:
 
 ```text
   Makes connection using Windows APIs:
@@ -3012,16 +3012,16 @@ Step 1: Container generates packet
     ↓
   Request reaches example.com:
     Appears to come from 192.168.1.100
-    (Corporate firewall allows it ✓)
+    (Corporate firewall allows it OK)
 ```
 
-**Step 8:** Response returns — Windows socket receives response, vpnkit.exe receives data.
+**Step 8:** Response returns -- Windows socket receives response, vpnkit.exe receives data.
 
 **Step 9:** Reverse mapping:
 
 ```text
   Lookup original connection:
-    192.168.1.100:61234 → 10.0.1.5:54321
+    192.168.1.100:61234 -> 10.0.1.5:54321
     ↓
   Reconstruct response packet:
     Dest IP: 10.0.1.5
@@ -3038,9 +3038,9 @@ Step 1: Container generates packet
   Signal VM
 ```
 
-**Step 11:** VPNKit client delivers — Read from shared memory → inject into VM network stack → container receives response.
+**Step 11:** VPNKit client delivers -- Read from shared memory -> inject into VM network stack -> container receives response.
 
-**Step 12:** Container receives response — Container sees normal HTTP response (unaware of all the proxying).
+**Step 12:** Container receives response -- Container sees normal HTTP response (unaware of all the proxying).
 
 ---
 
@@ -3064,7 +3064,7 @@ Container packet with source 10.0.1.5:
 VPNKit-rewritten packet with source 192.168.1.100:
   ├─ Corporate firewall sees: 192.168.1.100
   ├─ Recognized as legitimate employee laptop
-  └─ Firewall ALLOWS packet ✓
+  └─ Firewall ALLOWS packet OK
 ```
 
 **This is a HUGE RED FLAG for Docker Swarm.**
@@ -3115,14 +3115,14 @@ Original VXLAN packet (from Docker Swarm):
   Outer Dest IP: 192.168.1.200 (remote worker's VTEP)
   UDP Port: 4789
   VNI: 4097
-  Inner packet: Container-1 → Container-2
+  Inner packet: Container-1 -> Container-2
 
 If VPNKit rewrites source IP:
   Outer Source IP: 192.168.1.100 (Windows host IP)  ← Changed!
   Outer Dest IP: 192.168.1.200
   UDP Port: 4789
   VNI: 4097
-  Inner packet: Container-1 → Container-2
+  Inner packet: Container-1 -> Container-2
 
 Problem at remote worker (192.168.1.200):
   ├─ Receives VXLAN packet
@@ -3144,15 +3144,15 @@ Problem at remote worker (192.168.1.200):
 ```text
 Swarm Operation (VXLAN):
 
-worker-1 (192.168.1.200) ←→ Docker Desktop VM (172.20.144.5)
+worker-1 (192.168.1.200) ←-> Docker Desktop VM (172.20.144.5)
            ↕
       UDP:4789 (VXLAN)
       Bidirectional, peer-to-peer
 ```
 
 **VPNKit is designed for:**
-- **Outbound-initiated** connections (VM → internet)
-- **Request-response** patterns (client → server → client)
+- **Outbound-initiated** connections (VM -> internet)
+- **Request-response** patterns (client -> server -> client)
 - **Client role** for the VM
 
 **VPNKit cannot handle:**
@@ -3163,7 +3163,7 @@ worker-1 (192.168.1.200) ←→ Docker Desktop VM (172.20.144.5)
 Even if worker-1 tried to send VXLAN to `192.168.1.100` (Windows host), VPNKit would:
 1. Receive UDP packet on port 4789
 2. Not know how to route it to the VM
-3. No port forwarding rule exists for 4789 → VM
+3. No port forwarding rule exists for 4789 -> VM
 4. Packet dropped
 
 ---
@@ -3177,11 +3177,11 @@ Gossip Operation:
 
 worker-1 spontaneously sends to worker-2:
   "Health check: Are you alive?"
-  UDP: 192.168.1.200:7946 → 172.20.144.5:7946
+  UDP: 192.168.1.200:7946 -> 172.20.144.5:7946
 
 worker-2 spontaneously sends to worker-3:
   "Membership update: worker-4 joined"
-  UDP: 172.20.144.5:7946 → 192.168.1.220:7946
+  UDP: 172.20.144.5:7946 -> 192.168.1.220:7946
 ```
 
 **This is:**
@@ -3287,7 +3287,7 @@ T=8: VPNKit client delivers response
 **Why it fails:**
 
 **Port 2377 (Cluster Management - TCP):**
-- Requires inbound connections for worker → manager communication
+- Requires inbound connections for worker -> manager communication
 - VPNKit only handles outbound TCP well
 - NAT state table doesn't support unsolicited inbound
 - **Partial failure:** Might work for manager-initiated connections, fails for worker-initiated
@@ -3329,11 +3329,11 @@ Docker Swarm's architecture **fundamentally requires**:
 
 VPNKit's design decision to **rewrite source IPs** (essential for corporate VPN compatibility) directly conflicts with VXLAN's requirement for **source IP to be the VTEP address**.
 
-The **read-only filesystem of Docker Desktop's managed VM** prevents installing Tailscale inside it to provide routable IPs. (A separate WSL2 Ubuntu distro does not have this restriction — which is exactly why the solution involves installing both Docker Engine and Tailscale there instead.)
+The **read-only filesystem of Docker Desktop's managed VM** prevents installing Tailscale inside it to provide routable IPs. (A separate WSL2 Ubuntu distro does not have this restriction -- which is exactly why the solution involves installing both Docker Engine and Tailscale there instead.)
 
 The **ephemeral, NAT-isolated VM IP** means the node cannot be addressed by other swarm nodes.
 
-**Therefore, Docker Swarm on Docker Desktop is not just difficult—it is architecturally impossible without fundamentally redesigning Docker Desktop's networking model, which would break its core value proposition of seamless corporate network integration.**
+**Therefore, Docker Swarm on Docker Desktop is not just difficult--it is architecturally impossible without fundamentally redesigning Docker Desktop's networking model, which would break its core value proposition of seamless corporate network integration.**
 
 For Docker Swarm, use:
 - **Linux servers** with native Docker Engine (physical or VMs with bridged networking)
@@ -3348,8 +3348,8 @@ Docker Desktop remains excellent for **local development and testing**, but swar
 
 We now know exactly why Docker Desktop fails and what Swarm actually needs. The solution is to sidestep Docker Desktop entirely and give each machine two things that live in the **same Linux network namespace**:
 
-1. **Docker Engine** — running directly in WSL2 Ubuntu (not the `docker-desktop` distro)
-2. **Tailscale** — running in that same WSL2 Ubuntu, creating a real `tailscale0` interface there
+1. **Docker Engine** -- running directly in WSL2 Ubuntu (not the `docker-desktop` distro)
+2. **Tailscale** -- running in that same WSL2 Ubuntu, creating a real `tailscale0` interface there
 
 With both in the same namespace, `docker swarm init --advertise-addr $(tailscale ip -4)` just works. Docker can bind to the Tailscale IP, VXLAN packets go through the kernel WireGuard tunnel, and the gossip protocol reaches every node.
 
@@ -3357,13 +3357,13 @@ The encapsulation stack looks like this:
 
 ```
 App data
-  ↓  Container IP packet:  [IP: 10.0.1.2 → 10.0.1.3][TCP/UDP][Data]
+  ↓  Container IP packet:  [IP: 10.0.1.2 -> 10.0.1.3][TCP/UDP][Data]
   ↓  VXLAN encapsulation:  [UDP:4789][VXLAN Header][Container Packet]
   ↓  WireGuard encryption: [UDP:41641][WireGuard Encrypted Payload]
-  ↓  Windows NAT:          [Public IP][WireGuard Packet] → Internet
+  ↓  Windows NAT:          [Public IP][WireGuard Packet] -> Internet
 ```
 
-Windows NAT only ever sees the outermost UDP packet. Everything inside — VXLAN headers, container IPs, app data — is encrypted and opaque. That's why NAT doesn't break it.
+Windows NAT only ever sees the outermost UDP packet. Everything inside -- VXLAN headers, container IPs, app data -- is encrypted and opaque. That's why NAT doesn't break it.
 
 ---
 
@@ -3427,7 +3427,7 @@ sudo tailscale up
 # Follow the authentication URL printed in the terminal
 ```
 
-Get your Tailscale IP — this is what everything else will use:
+Get your Tailscale IP -- this is what everything else will use:
 
 ```bash
 tailscale ip -4
@@ -3441,10 +3441,10 @@ tailscale ip -4
 Before touching Swarm, confirm the two machines can actually reach each other through Tailscale. Do this from both sides.
 
 ```bash
-# From Machine A — ping Machine B's Tailscale IP
+# From Machine A -- ping Machine B's Tailscale IP
 ping -c 4 <MACHINE_B_TAILSCALE_IP>
 
-# From Machine B — ping Machine A's Tailscale IP
+# From Machine B -- ping Machine A's Tailscale IP
 ping -c 4 <MACHINE_A_TAILSCALE_IP>
 ```
 
@@ -3457,7 +3457,7 @@ tailscale status
 # 100.101.102.104  machine-c  relay   ← Via DERP relay (still works, slightly higher latency)
 ```
 
-Direct connections are faster, but relay connections work fine for Swarm. Tailscale handles NAT traversal automatically — you don't need to configure anything for this.
+Direct connections are faster, but relay connections work fine for Swarm. Tailscale handles NAT traversal automatically -- you don't need to configure anything for this.
 
 ---
 
@@ -3467,7 +3467,7 @@ Swarm uses three ports for its internal protocols. These need to be open on ever
 
 | Port | Protocol | Purpose |
 |------|----------|---------|
-| 2377 | TCP | Raft cluster management (manager ↔ manager, worker → manager) |
+| 2377 | TCP | Raft cluster management (manager ↔ manager, worker -> manager) |
 | 7946 | TCP + UDP | SWIM gossip protocol (mesh, all nodes) |
 | 4789 | UDP | VXLAN overlay traffic |
 
@@ -3482,7 +3482,7 @@ sudo ufw allow 4789/udp
 
 #### On cloud VMs (e.g. GCP, AWS)
 
-Create a firewall rule that allows these ports **only from the Tailscale IP range** (`100.64.0.0/10`). There's no need to expose Swarm ports to the public internet — all Swarm traffic will travel through the Tailscale tunnel.
+Create a firewall rule that allows these ports **only from the Tailscale IP range** (`100.64.0.0/10`). There's no need to expose Swarm ports to the public internet -- all Swarm traffic will travel through the Tailscale tunnel.
 
 ```bash
 # GCP example (run from local machine with gcloud installed)
@@ -3516,7 +3516,7 @@ Docker overlay (VXLAN) overhead:  50 bytes
 Effective container MTU:         ~1170 bytes
 ```
 
-This means Docker's overlay network operates safely within Tailscale's MTU without any fragmentation. You do **not** need to manually configure Docker's MTU — the kernel handles the math.
+This means Docker's overlay network operates safely within Tailscale's MTU without any fragmentation. You do **not** need to manually configure Docker's MTU -- the kernel handles the math.
 
 You can verify there are no fragmentation issues by testing with a fixed-size ping:
 
@@ -3527,7 +3527,7 @@ ping -M do -s 1252 -c 4 <OTHER_MACHINE_TAILSCALE_IP>
 # All 4 packets should succeed
 
 ping -M do -s 1400 -c 2 <OTHER_MACHINE_TAILSCALE_IP>
-# This should fail with "Message too long" — expected
+# This should fail with "Message too long" -- expected
 ```
 
 ---
@@ -3557,7 +3557,7 @@ To add a worker to this swarm, run the following command:
 To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
 ```
 
-Copy the full `docker swarm join` command — you'll need it in the next step.
+Copy the full `docker swarm join` command -- you'll need it in the next step.
 
 Confirm what address Swarm advertised (it should be your Tailscale IP, not `192.168.65.x`):
 
@@ -3617,7 +3617,7 @@ ccc333        web-test.3    nginx:alpine  machine-a   Running         Running
 ddd444        web-test.4    nginx:alpine  machine-b   Running         Running
 ```
 
-Containers are distributed across both nodes. Docker's routing mesh means you can `curl http://localhost:8080` on **either** machine and reach any replica — even ones on the other node.
+Containers are distributed across both nodes. Docker's routing mesh means you can `curl http://localhost:8080` on **either** machine and reach any replica -- even ones on the other node.
 
 ```bash
 curl http://localhost:8080 | grep -o "Welcome to nginx"
@@ -3626,7 +3626,7 @@ curl http://localhost:8080 | grep -o "Welcome to nginx"
 
 #### Test 2: Overlay network and service discovery
 
-This test confirms that containers on different nodes can find and talk to each other by **name** through the overlay network — the core feature that makes Swarm useful for real applications.
+This test confirms that containers on different nodes can find and talk to each other by **name** through the overlay network -- the core feature that makes Swarm useful for real applications.
 
 ```bash
 # Create a custom overlay network
@@ -3673,10 +3673,10 @@ docker service rm web-test webapp redis
 # Remove custom network
 docker network rm app-network
 
-# On worker machines — leave the swarm
+# On worker machines -- leave the swarm
 docker swarm leave
 
-# On manager — remove downed nodes, then dismantle
+# On manager -- remove downed nodes, then dismantle
 docker node rm <WORKER_NODE_ID>
 docker swarm leave --force
 
